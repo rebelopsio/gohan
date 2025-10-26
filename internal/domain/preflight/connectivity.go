@@ -53,7 +53,12 @@ func (c InternetConnectivity) IsConnected() bool {
 
 // TestedEndpoints returns all tested endpoints
 func (c InternetConnectivity) TestedEndpoints() []ConnectivityTest {
-	return c.testedEndpoints
+	if c.testedEndpoints == nil {
+		return nil
+	}
+	result := make([]ConnectivityTest, len(c.testedEndpoints))
+	copy(result, c.testedEndpoints)
+	return result
 }
 
 // AverageLatency returns average response time

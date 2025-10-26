@@ -46,7 +46,12 @@ func (s *ValidationSession) OverallResult() ValidationOutcome {
 
 // Results returns all validation results
 func (s *ValidationSession) Results() []ValidationResult {
-	return s.results
+	if s.results == nil {
+		return nil
+	}
+	result := make([]ValidationResult, len(s.results))
+	copy(result, s.results)
+	return result
 }
 
 // AddResult adds a validation result to the session
@@ -83,24 +88,34 @@ func (s *ValidationSession) HasWarnings() bool {
 
 // BlockingResults returns all blocking validation failures
 func (s *ValidationSession) BlockingResults() []ValidationResult {
-	blockers := make([]ValidationResult, 0)
+	var blockers []ValidationResult
 	for _, result := range s.results {
 		if result.IsBlocking() {
 			blockers = append(blockers, result)
 		}
 	}
-	return blockers
+	if blockers == nil {
+		return nil
+	}
+	result := make([]ValidationResult, len(blockers))
+	copy(result, blockers)
+	return result
 }
 
 // WarningResults returns all warning-level results
 func (s *ValidationSession) WarningResults() []ValidationResult {
-	warnings := make([]ValidationResult, 0)
+	var warnings []ValidationResult
 	for _, result := range s.results {
 		if result.IsWarning() {
 			warnings = append(warnings, result)
 		}
 	}
-	return warnings
+	if warnings == nil {
+		return nil
+	}
+	result := make([]ValidationResult, len(warnings))
+	copy(result, warnings)
+	return result
 }
 
 // CanProceed returns true if installation can continue

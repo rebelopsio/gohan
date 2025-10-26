@@ -40,7 +40,12 @@ func (g UserGuidance) Reason() string {
 
 // ActionableSteps returns steps to resolve the issue
 func (g UserGuidance) ActionableSteps() []string {
-	return g.actionableSteps
+	if g.actionableSteps == nil {
+		return nil
+	}
+	result := make([]string, len(g.actionableSteps))
+	copy(result, g.actionableSteps)
+	return result
 }
 
 // DocumentationURL returns link to relevant documentation

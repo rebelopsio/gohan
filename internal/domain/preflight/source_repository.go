@@ -26,7 +26,12 @@ func (s SourceRepositoryStatus) IsEnabled() bool {
 
 // ConfiguredSources returns all configured source repos
 func (s SourceRepositoryStatus) ConfiguredSources() []string {
-	return s.configuredSources
+	if s.configuredSources == nil {
+		return nil
+	}
+	result := make([]string, len(s.configuredSources))
+	copy(result, s.configuredSources)
+	return result
 }
 
 // HasDebSrc checks if deb-src lines exist
