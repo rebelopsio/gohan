@@ -61,11 +61,15 @@ func (d *DebianVersionDetector) IsDebianBased(ctx context.Context) bool {
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 
+		// Check if it's Debian itself
 		if strings.HasPrefix(line, "ID=") {
 			id := strings.Trim(strings.TrimPrefix(line, "ID="), "\"")
-			return id == "debian"
+			if id == "debian" {
+				return true
+			}
 		}
 
+		// Check if it's Debian-derived (like Ubuntu)
 		if strings.HasPrefix(line, "ID_LIKE=") {
 			idLike := strings.Trim(strings.TrimPrefix(line, "ID_LIKE="), "\"")
 			return strings.Contains(idLike, "debian")

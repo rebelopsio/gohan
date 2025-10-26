@@ -1,4 +1,4 @@
-.PHONY: build test test-integration test-race clean install lint
+.PHONY: build test test-unit test-integration test-all test-race test-wizard clean install dev-install lint
 
 # Build configuration
 BINARY_NAME=gohan
@@ -15,22 +15,42 @@ build:
 # Install to /usr/local/bin
 install: build
 	@echo "Installing ${BINARY_NAME} to /usr/local/bin..."
-	@sudo mv bin/${BINARY_NAME} /usr/local/bin/
+	@sudo cp bin/${BINARY_NAME} /usr/local/bin/
+	@echo "Installed! Run with: ${BINARY_NAME}"
 
-# Run all tests
-test:
-	@echo "Running tests..."
-	@go test -v ./...
+# Install for local development (no sudo)
+dev-install: build
+	@echo "Binary built for local development: ./bin/${BINARY_NAME}"
+	@echo "Run with: ./bin/${BINARY_NAME} or sudo ./bin/${BINARY_NAME} init"
+
+# Run all tests (alias for test-all)
+test: test-all
+
+# Run unit tests only (excluding integration)
+test-unit:
+	@echo "Running unit tests..."
+	@go test -v ./internal/...
 
 # Run integration tests
 test-integration:
 	@echo "Running integration tests..."
 	@go test -v -tags=integration ./tests/integration/...
 
+# Run all tests (unit + integration)
+test-all:
+	@echo "Running all tests..."
+	@go test -v ./internal/...
+	@go test -v -tags=integration ./tests/integration/...
+
 # Run tests with race detector
 test-race:
 	@echo "Running tests with race detector..."
-	@go test -race ./...
+	@go test -race ./internal/...
+
+# Run the TUI wizard for testing
+test-wizard: build
+	@echo "Running preflight validation wizard..."
+	@sudo ./bin/${BINARY_NAME} init
 
 # Run tests with coverage
 test-coverage:
@@ -67,14 +87,26 @@ tidy:
 # Display help
 help:
 	@echo "Gohan - Makefile commands:"
+	@echo ""
+	@echo "Build & Install:"
 	@echo "  make build           Build the binary"
-	@echo "  make install         Install to /usr/local/bin"
-	@echo "  make test            Run all tests"
+	@echo "  make install         Install to /usr/local/bin (requires sudo)"
+	@echo "  make dev-install     Build for local development (no sudo)"
+	@echo ""
+	@echo "Testing:"
+	@echo "  make test            Run all tests (unit + integration)"
+	@echo "  make test-unit       Run unit tests only"
 	@echo "  make test-integration Run integration tests"
+	@echo "  make test-all        Run both unit and integration tests"
 	@echo "  make test-race       Run tests with race detector"
 	@echo "  make test-coverage   Generate test coverage report"
-	@echo "  make clean           Clean build artifacts"
-	@echo "  make lint            Run linter"
+	@echo "  make test-wizard     Run the preflight validation TUI wizard"
+	@echo ""
+	@echo "Development:"
 	@echo "  make run             Run the application"
 	@echo "  make fmt             Format code"
 	@echo "  make tidy            Tidy dependencies"
+	@echo "  make lint            Run linter (requires golangci-lint)"
+	@echo ""
+	@echo "Cleanup:"
+	@echo "  make clean           Clean build artifacts"
