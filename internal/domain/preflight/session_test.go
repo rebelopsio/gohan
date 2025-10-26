@@ -1,11 +1,13 @@
 package preflight_test
 
 import (
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/rebelopsio/gohan/internal/domain/preflight"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewValidationSession(t *testing.T) {
@@ -363,6 +365,93 @@ func TestValidationSession_RealWorldScenario_Blocked(t *testing.T) {
 	assert.True(t, session.HasWarnings())
 	assert.Len(t, session.BlockingResults(), 2)
 	assert.Len(t, session.WarningResults(), 1)
+}
+
+func TestValidationSession_ConcurrentAddResult(t *testing.T) {
+	session := preflight.NewValidationSession()
+	var wg sync.WaitGroup
+
+	// Add 100 results concurrently
+	numGoroutines := 100
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			session.AddResult(createPassResult(preflight.RequirementDebianVersion))
+		}()
+	}
+
+	wg.Wait()
+
+	results := session.Results()
+	assert.Len(t, results, numGoroutines, "All concurrent AddResult calls should succeed")
+}
+
+func TestValidationSession_Results_DefensiveCopy(t *testing.T) {
+	session := preflight.NewValidationSession()
+	result := createPassResult(preflight.RequirementDebianVersion)
+	session.AddResult(result)
+
+	// Get results slice
+	results1 := session.Results()
+	require.Len(t, results1, 1)
+
+	// Try to modify returned slice by appending
+	results1 = append(results1, createPassResult(preflight.RequirementDiskSpace))
+
+	// Get results again - should not be affected by external modification
+	results2 := session.Results()
+	assert.Len(t, results2, 1, "External modification should not affect internal session state")
+}
+
+func TestValidationSession_BlockingResults_DefensiveCopy(t *testing.T) {
+	session := preflight.NewValidationSession()
+	session.AddResult(createBlockingResult(preflight.RequirementDebianVersion, preflight.SeverityCritical))
+
+	// Get blocking results
+	blockers1 := session.BlockingResults()
+	require.Len(t, blockers1, 1)
+
+	// Try to modify returned slice
+	blockers1 = append(blockers1, createBlockingResult(preflight.RequirementDiskSpace, preflight.SeverityHigh))
+
+	// Get blocking results again
+	blockers2 := session.BlockingResults()
+	assert.Len(t, blockers2, 1, "External modification should not affect internal state")
+}
+
+func TestValidationSession_WarningResults_DefensiveCopy(t *testing.T) {
+	session := preflight.NewValidationSession()
+	session.AddResult(createWarningResult(preflight.RequirementGPUSupport))
+
+	// Get warning results
+	warnings1 := session.WarningResults()
+	require.Len(t, warnings1, 1)
+
+	// Try to modify returned slice
+	warnings1 = append(warnings1, createWarningResult(preflight.RequirementSourceRepos))
+
+	// Get warning results again
+	warnings2 := session.WarningResults()
+	assert.Len(t, warnings2, 1, "External modification should not affect internal state")
+}
+
+func TestValidationSession_Complete_Idempotent(t *testing.T) {
+	session := preflight.NewValidationSession()
+
+	// Complete once
+	session.Complete()
+	firstCompletedAt := session.CompletedAt()
+	assert.False(t, firstCompletedAt.IsZero())
+
+	// Wait and complete again
+	time.Sleep(10 * time.Millisecond)
+	session.Complete()
+	secondCompletedAt := session.CompletedAt()
+
+	// CompletedAt should not change
+	assert.Equal(t, firstCompletedAt, secondCompletedAt,
+		"Complete should be idempotent - completedAt should not change on second call")
 }
 
 // Helper functions for creating test results
