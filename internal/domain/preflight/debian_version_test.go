@@ -10,11 +10,12 @@ import (
 
 func TestNewDebianVersion(t *testing.T) {
 	tests := []struct {
-		name          string
-		codename      string
-		versionNumber string
-		wantErr       bool
-		errType       error
+		name             string
+		codename         string
+		versionNumber    string
+		wantErr          bool
+		errType          error
+		errMessageContains string
 	}{
 		{
 			name:          "valid sid",
@@ -35,18 +36,20 @@ func TestNewDebianVersion(t *testing.T) {
 			wantErr:       false,
 		},
 		{
-			name:          "empty codename",
-			codename:      "",
-			versionNumber: "13",
-			wantErr:       true,
-			errType:       preflight.ErrInvalidDebianVersion,
+			name:               "empty codename",
+			codename:           "",
+			versionNumber:      "13",
+			wantErr:            true,
+			errType:            preflight.ErrInvalidDebianVersion,
+			errMessageContains: "codename",
 		},
 		{
-			name:          "whitespace only codename",
-			codename:      "   ",
-			versionNumber: "13",
-			wantErr:       true,
-			errType:       preflight.ErrInvalidDebianVersion,
+			name:               "whitespace only codename",
+			codename:           "   ",
+			versionNumber:      "13",
+			wantErr:            true,
+			errType:            preflight.ErrInvalidDebianVersion,
+			errMessageContains: "codename",
 		},
 		{
 			name:          "codename with uppercase",
@@ -70,6 +73,10 @@ func TestNewDebianVersion(t *testing.T) {
 				require.Error(t, err)
 				if tt.errType != nil {
 					assert.ErrorIs(t, err, tt.errType)
+				}
+				if tt.errMessageContains != "" {
+					assert.Contains(t, err.Error(), tt.errMessageContains,
+						"Error message should contain helpful context")
 				}
 				return
 			}

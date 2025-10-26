@@ -20,6 +20,11 @@ func NewUserGuidance(
 	actionableSteps []string,
 	documentationURL string,
 ) UserGuidance {
+	// Ensure non-nil slice
+	if actionableSteps == nil {
+		actionableSteps = []string{}
+	}
+
 	return UserGuidance{
 		message:          message,
 		reason:           reason,

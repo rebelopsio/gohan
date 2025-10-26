@@ -2,6 +2,7 @@ package preflight
 
 import (
 	"fmt"
+	"strings"
 )
 
 const (
@@ -22,6 +23,8 @@ func NewDiskSpace(available uint64, total uint64, path string) (DiskSpace, error
 		return DiskSpace{}, ErrInvalidDiskSpace
 	}
 
+	// Trim whitespace and default to root if empty
+	path = strings.TrimSpace(path)
 	if path == "" {
 		path = "/"
 	}

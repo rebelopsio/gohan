@@ -13,6 +13,11 @@ func NewSourceRepositoryStatus(
 	isEnabled bool,
 	configuredSources []string,
 ) SourceRepositoryStatus {
+	// Ensure non-nil slice
+	if configuredSources == nil {
+		configuredSources = []string{}
+	}
+
 	return SourceRepositoryStatus{
 		isEnabled:         isEnabled,
 		configuredSources: configuredSources,

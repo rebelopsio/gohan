@@ -201,3 +201,31 @@ func TestGPUType_String(t *testing.T) {
 		})
 	}
 }
+
+func TestGPUType_EmptyValues(t *testing.T) {
+	t.Run("empty model", func(t *testing.T) {
+		gpu, err := preflight.NewGPUType(preflight.GPUVendorAMD, "", "1002:744c")
+		require.NoError(t, err)
+
+		assert.Equal(t, preflight.GPUVendorAMD, gpu.Vendor())
+		assert.Empty(t, gpu.Model())
+		assert.Equal(t, "1002:744c", gpu.PCIID())
+	})
+
+	t.Run("empty PCI ID", func(t *testing.T) {
+		gpu, err := preflight.NewGPUType(preflight.GPUVendorIntel, "UHD Graphics 770", "")
+		require.NoError(t, err)
+
+		assert.Equal(t, preflight.GPUVendorIntel, gpu.Vendor())
+		assert.Equal(t, "UHD Graphics 770", gpu.Model())
+		assert.Empty(t, gpu.PCIID())
+	})
+
+	t.Run("whitespace trimming", func(t *testing.T) {
+		gpu, err := preflight.NewGPUType(preflight.GPUVendorNVIDIA, "  RTX 4090  ", "  10de:2684  ")
+		require.NoError(t, err)
+
+		assert.Equal(t, "RTX 4090", gpu.Model())
+		assert.Equal(t, "10de:2684", gpu.PCIID())
+	})
+}

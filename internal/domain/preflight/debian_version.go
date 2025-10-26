@@ -1,6 +1,7 @@
 package preflight
 
 import (
+	"fmt"
 	"strings"
 )
 
@@ -21,7 +22,7 @@ func NewDebianVersion(codename string, versionNumber string) (DebianVersion, err
 	codename = strings.ToLower(strings.TrimSpace(codename))
 
 	if codename == "" {
-		return DebianVersion{}, ErrInvalidDebianVersion
+		return DebianVersion{}, fmt.Errorf("%w: codename cannot be empty", ErrInvalidDebianVersion)
 	}
 
 	return DebianVersion{

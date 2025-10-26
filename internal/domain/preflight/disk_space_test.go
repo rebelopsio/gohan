@@ -298,3 +298,31 @@ func TestDiskSpace_String(t *testing.T) {
 	assert.Contains(t, str, "100.00 GB total")
 	assert.Contains(t, str, "50.0% used")
 }
+
+func TestDiskSpace_ZeroValues(t *testing.T) {
+	t.Run("zero available and total", func(t *testing.T) {
+		diskSpace, err := preflight.NewDiskSpace(0, 0, "/")
+		require.NoError(t, err)
+
+		assert.Equal(t, uint64(0), diskSpace.Available())
+		assert.Equal(t, uint64(0), diskSpace.Total())
+		assert.Equal(t, float64(0), diskSpace.AvailableGB())
+		assert.Equal(t, float64(0), diskSpace.TotalGB())
+		assert.Equal(t, float64(0), diskSpace.UsagePercent())
+		assert.False(t, diskSpace.MeetsMinimum(1))
+	})
+
+	t.Run("empty path defaults to root", func(t *testing.T) {
+		diskSpace, err := preflight.NewDiskSpace(10*preflight.GB, 100*preflight.GB, "")
+		require.NoError(t, err)
+
+		assert.Equal(t, "/", diskSpace.Path())
+	})
+
+	t.Run("whitespace path defaults to root", func(t *testing.T) {
+		diskSpace, err := preflight.NewDiskSpace(10*preflight.GB, 100*preflight.GB, "   ")
+		require.NoError(t, err)
+
+		assert.Equal(t, "/", diskSpace.Path())
+	})
+}

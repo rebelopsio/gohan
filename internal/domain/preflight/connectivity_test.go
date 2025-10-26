@@ -224,3 +224,28 @@ func TestInternetConnectivity_OnlySuccessfulTestsCountForAverage(t *testing.T) {
 	// Average should only include successful tests: (50 + 100) / 2 = 75ms
 	assert.Equal(t, 75*time.Millisecond, connectivity.AverageLatency())
 }
+
+func TestInternetConnectivity_NilEndpoints(t *testing.T) {
+	connectivity := preflight.NewInternetConnectivity(true, nil)
+
+	assert.True(t, connectivity.IsConnected())
+	assert.NotNil(t, connectivity.TestedEndpoints(), "Should return non-nil slice")
+	assert.Len(t, connectivity.TestedEndpoints(), 0, "Should return empty slice for nil input")
+	assert.Equal(t, time.Duration(0), connectivity.AverageLatency())
+}
+
+func TestInternetConnectivity_EmptyEndpoints(t *testing.T) {
+	connectivity := preflight.NewInternetConnectivity(false, []preflight.ConnectivityTest{})
+
+	assert.False(t, connectivity.IsConnected())
+	assert.Len(t, connectivity.TestedEndpoints(), 0)
+	assert.Equal(t, time.Duration(0), connectivity.AverageLatency())
+}
+
+func TestInternetConnectivity_ZeroLatency(t *testing.T) {
+	connectivity := preflight.NewInternetConnectivity(true, []preflight.ConnectivityTest{
+		{Endpoint: "debian.org", Success: true, Latency: 0},
+	})
+
+	assert.Equal(t, time.Duration(0), connectivity.AverageLatency())
+}

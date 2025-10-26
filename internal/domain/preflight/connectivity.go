@@ -24,6 +24,11 @@ func NewInternetConnectivity(
 	isConnected bool,
 	testedEndpoints []ConnectivityTest,
 ) InternetConnectivity {
+	// Ensure non-nil slice
+	if testedEndpoints == nil {
+		testedEndpoints = []ConnectivityTest{}
+	}
+
 	var totalLatency time.Duration
 	successCount := 0
 

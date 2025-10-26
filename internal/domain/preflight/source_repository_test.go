@@ -166,3 +166,20 @@ func TestSourceRepositoryStatus_ConfiguredSources(t *testing.T) {
 		assert.Equal(t, source, retrieved[i])
 	}
 }
+
+func TestSourceRepositoryStatus_NilSources(t *testing.T) {
+	status := preflight.NewSourceRepositoryStatus(true, nil)
+
+	assert.True(t, status.IsEnabled())
+	assert.NotNil(t, status.ConfiguredSources(), "Should return non-nil slice")
+	assert.Len(t, status.ConfiguredSources(), 0, "Should return empty slice for nil input")
+	assert.False(t, status.HasDebSrc())
+}
+
+func TestSourceRepositoryStatus_EmptySources(t *testing.T) {
+	status := preflight.NewSourceRepositoryStatus(false, []string{})
+
+	assert.False(t, status.IsEnabled())
+	assert.Len(t, status.ConfiguredSources(), 0)
+	assert.False(t, status.HasDebSrc())
+}

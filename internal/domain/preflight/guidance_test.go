@@ -230,3 +230,44 @@ func TestUserGuidance_RealWorldExamples(t *testing.T) {
 		assert.True(t, guidance.HasSteps())
 	})
 }
+
+func TestUserGuidance_NilSteps(t *testing.T) {
+	guidance := preflight.NewUserGuidance(
+		"Test message",
+		"Test reason",
+		nil,
+		"https://example.com",
+	)
+
+	assert.False(t, guidance.HasSteps())
+	assert.NotNil(t, guidance.ActionableSteps(), "Should return non-nil slice")
+	assert.Len(t, guidance.ActionableSteps(), 0, "Should return empty slice for nil input")
+
+	formatted := guidance.Format()
+	assert.Contains(t, formatted, "Test message")
+	assert.NotContains(t, formatted, "How to fix:")
+}
+
+func TestUserGuidance_EmptyStrings(t *testing.T) {
+	guidance := preflight.NewUserGuidance("", "", []string{}, "")
+
+	assert.Empty(t, guidance.Message())
+	assert.Empty(t, guidance.Reason())
+	assert.Empty(t, guidance.DocumentationURL())
+	assert.False(t, guidance.HasSteps())
+}
+
+func TestUserGuidance_OnlyMessage(t *testing.T) {
+	guidance := preflight.NewUserGuidance("Important message", "", nil, "")
+
+	assert.Equal(t, "Important message", guidance.Message())
+	assert.Empty(t, guidance.Reason())
+	assert.Empty(t, guidance.DocumentationURL())
+	assert.False(t, guidance.HasSteps())
+
+	formatted := guidance.Format()
+	assert.Contains(t, formatted, "Important message")
+	assert.NotContains(t, formatted, "Reason:")
+	assert.NotContains(t, formatted, "How to fix:")
+	assert.NotContains(t, formatted, "Learn more:")
+}
