@@ -101,7 +101,7 @@ func TestInstallationE2E(t *testing.T) {
 		// Step 2: Execute installation
 		// Execute in a goroutine and wait for completion
 		go func() {
-			_, err := executeUseCase.Execute(ctx, sessionID)
+			_, err := executeUseCase.Execute(ctx, sessionID, nil)
 			if err != nil {
 				t.Logf("Installation execution error: %v", err)
 			}
@@ -259,7 +259,7 @@ func TestInstallationE2E_MultipleInstallations(t *testing.T) {
 		sessionID := startResp.SessionID
 
 		// Execute and wait
-		go executeUseCase.Execute(ctx, sessionID)
+		go executeUseCase.Execute(ctx, sessionID, nil)
 
 		// Simple wait for completion
 		time.Sleep(500 * time.Millisecond)

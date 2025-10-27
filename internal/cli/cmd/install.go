@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 
 	"github.com/rebelopsio/gohan/internal/application/installation/dto"
 	"github.com/rebelopsio/gohan/internal/config"
@@ -145,7 +144,7 @@ func runInstallLocal(ctx context.Context, request dto.InstallationRequest) error
 	// Create progress channel
 	progressChan := make(chan installTUI.ProgressUpdate, 100)
 
-	// Launch installation in a goroutine with progress updates
+	// Launch installation in a goroutine with real progress updates
 	go func() {
 		defer close(progressChan)
 
@@ -157,36 +156,19 @@ func runInstallLocal(ctx context.Context, request dto.InstallationRequest) error
 			ComponentsTotal: response.ComponentCount,
 		}
 
-		time.Sleep(500 * time.Millisecond)
-
-		// Simulate progress updates (in real implementation, these would come from the use case)
-		phases := []struct {
-			name    string
-			percent int
-			message string
-		}{
-			{"Checking Requirements", 10, "Verifying system requirements"},
-			{"Resolving Dependencies", 25, "Analyzing package dependencies"},
-			{"Downloading Packages", 40, "Downloading required packages"},
-			{"Installing Dependencies", 60, "Installing dependency packages"},
-			{"Installing Main Package", 80, "Installing " + packageName},
-			{"Configuring", 90, "Applying configuration"},
-			{"Finalizing", 95, "Cleaning up temporary files"},
-		}
-
-		for i, phase := range phases {
-			time.Sleep(300 * time.Millisecond)
+		// Create progress callback that feeds the TUI
+		progressCallback := func(phase string, percent int, message string, componentsInstalled, componentsTotal int) {
 			progressChan <- installTUI.ProgressUpdate{
-				Phase:               phase.name,
-				PercentComplete:     phase.percent,
-				Message:             phase.message,
-				ComponentsInstalled: i,
-				ComponentsTotal:     response.ComponentCount,
+				Phase:               phase,
+				PercentComplete:     percent,
+				Message:             message,
+				ComponentsInstalled: componentsInstalled,
+				ComponentsTotal:     componentsTotal,
 			}
 		}
 
-		// Execute the actual installation
-		progress, err := c.ExecuteInstallationUseCase.Execute(ctx, response.SessionID)
+		// Execute the actual installation with real progress updates
+		progress, err := c.ExecuteInstallationUseCase.Execute(ctx, response.SessionID, progressCallback)
 
 		// Final update
 		if err != nil {

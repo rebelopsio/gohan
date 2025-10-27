@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/rebelopsio/gohan/internal/application/installation/dto"
+	"github.com/rebelopsio/gohan/internal/application/installation/usecases"
 	httpinfra "github.com/rebelopsio/gohan/internal/infrastructure/http"
 	"github.com/rebelopsio/gohan/internal/infrastructure/http/handlers"
 	"github.com/stretchr/testify/assert"
@@ -35,8 +36,8 @@ type MockExecuteInstallationUseCase struct {
 	mock.Mock
 }
 
-func (m *MockExecuteInstallationUseCase) Execute(ctx context.Context, sessionID string) (*dto.InstallationProgressResponse, error) {
-	args := m.Called(ctx, sessionID)
+func (m *MockExecuteInstallationUseCase) Execute(ctx context.Context, sessionID string, progressCallback usecases.ProgressCallback) (*dto.InstallationProgressResponse, error) {
+	args := m.Called(ctx, sessionID, progressCallback)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -162,7 +163,7 @@ func TestServer_Routes(t *testing.T) {
 			ComponentsTotal:     1,
 		}
 
-		mockExecuteUseCase.On("Execute", mock.Anything, sessionID).
+		mockExecuteUseCase.On("Execute", mock.Anything, sessionID, mock.Anything).
 			Return(expectedResponse, nil)
 
 		req := httptest.NewRequest(http.MethodPost, "/api/installation/"+sessionID+"/execute", nil)

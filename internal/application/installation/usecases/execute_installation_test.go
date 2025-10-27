@@ -172,7 +172,7 @@ func TestExecuteInstallationUseCase_Execute(t *testing.T) {
 		)
 		ctx := context.Background()
 
-		response, err := useCase.Execute(ctx, session.ID())
+		response, err := useCase.Execute(ctx, session.ID(), nil)
 
 		require.NoError(t, err)
 		assert.Equal(t, session.ID(), response.SessionID)
@@ -249,7 +249,7 @@ func TestExecuteInstallationUseCase_Execute(t *testing.T) {
 		)
 		ctx := context.Background()
 
-		response, err := useCase.Execute(ctx, session.ID())
+		response, err := useCase.Execute(ctx, session.ID(), nil)
 
 		require.NoError(t, err)
 		assert.Equal(t, session.ID(), response.SessionID)
@@ -276,7 +276,7 @@ func TestExecuteInstallationUseCase_Execute(t *testing.T) {
 		)
 		ctx := context.Background()
 
-		_, err := useCase.Execute(ctx, "nonexistent-id")
+		_, err := useCase.Execute(ctx, "nonexistent-id", nil)
 
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, installation.ErrSessionNotFound)
@@ -337,7 +337,7 @@ func TestExecuteInstallationUseCase_Execute(t *testing.T) {
 		)
 		ctx := context.Background()
 
-		response, err := useCase.Execute(ctx, session.ID())
+		response, err := useCase.Execute(ctx, session.ID(), nil)
 
 		require.NoError(t, err) // Use case doesn't error, but marks session as failed
 		assert.Equal(t, "failed", response.Status)

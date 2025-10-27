@@ -21,6 +21,9 @@ type HistoryRecorder interface {
 	RecordInstallation(ctx context.Context, session *installation.InstallationSession) (history.RecordID, error)
 }
 
+// ProgressCallback is called during installation to report progress
+type ProgressCallback func(phase string, percent int, message string, componentsInstalled, componentsTotal int)
+
 // ExecuteInstallationUseCase handles executing an installation session
 type ExecuteInstallationUseCase struct {
 	sessionRepo       installation.InstallationSessionRepository
@@ -51,16 +54,30 @@ func NewExecuteInstallationUseCase(
 }
 
 // Execute executes an installation session
-func (u *ExecuteInstallationUseCase) Execute(ctx context.Context, sessionID string) (*dto.InstallationProgressResponse, error) {
+// The progressCallback parameter is optional and will be called with progress updates
+func (u *ExecuteInstallationUseCase) Execute(ctx context.Context, sessionID string, progressCallback ProgressCallback) (*dto.InstallationProgressResponse, error) {
 	// Retrieve the session
 	session, err := u.sessionRepo.FindByID(ctx, sessionID)
 	if err != nil {
 		return nil, err
 	}
 
+	// Get total components for progress reporting
+	totalComponents := len(session.Configuration().Components())
+
+	// Report initial progress
+	if progressCallback != nil {
+		progressCallback("Starting Preparation", 0, "Initializing installation session", 0, totalComponents)
+	}
+
 	// Create a system snapshot before starting
 	// TODO: In real implementation, capture actual system state
 	config := session.Configuration()
+
+	if progressCallback != nil {
+		progressCallback("Creating Snapshot", 5, "Creating system snapshot", 0, totalComponents)
+	}
+
 	snapshot, err := installation.NewSystemSnapshot(
 		"/var/lib/gohan/snapshots",
 		config.DiskSpace(),
@@ -84,6 +101,10 @@ func (u *ExecuteInstallationUseCase) Execute(ctx context.Context, sessionID stri
 	}
 
 	// Detect conflicts
+	if progressCallback != nil {
+		progressCallback("Checking Requirements", 10, "Detecting package conflicts", 0, totalComponents)
+	}
+
 	conflicts, err := u.conflictResolver.DetectConflicts(ctx, config.Components())
 	if err != nil {
 		return u.handleInstallationError(ctx, session, fmt.Sprintf("conflict detection failed: %v", err))
@@ -91,6 +112,10 @@ func (u *ExecuteInstallationUseCase) Execute(ctx context.Context, sessionID stri
 
 	// Resolve conflicts if any
 	if len(conflicts) > 0 {
+		if progressCallback != nil {
+			progressCallback("Resolving Conflicts", 15, fmt.Sprintf("Resolving %d package conflicts", len(conflicts)), 0, totalComponents)
+		}
+
 		for _, conflict := range conflicts {
 			// Default strategy: remove conflicting package
 			if err := u.conflictResolver.ResolveConflict(ctx, conflict, installation.ActionRemove); err != nil {
@@ -116,6 +141,22 @@ func (u *ExecuteInstallationUseCase) Execute(ctx context.Context, sessionID stri
 		// Extract package name and version
 		packageName := componentToPackageName(comp.Component())
 		version := comp.Version()
+
+		// Calculate progress percentage (20-80% range for installations)
+		// Each component gets equal portion of the 60% range
+		baseProgress := 20
+		progressRange := 60
+		componentProgress := baseProgress + (progressRange * i / len(components))
+
+		if progressCallback != nil {
+			progressCallback(
+				"Installing Components",
+				componentProgress,
+				fmt.Sprintf("Installing %s (%d/%d)", packageName, i+1, len(components)),
+				i,
+				totalComponents,
+			)
+		}
 
 		// Install the package
 		if err := u.packageManager.InstallPackage(ctx, packageName, version); err != nil {
@@ -158,6 +199,17 @@ func (u *ExecuteInstallationUseCase) Execute(ctx context.Context, sessionID stri
 			fmt.Sprintf("Installed %s", comp.Component()),
 		)
 
+		// Report completion of this component
+		if progressCallback != nil {
+			progressCallback(
+				"Installing Components",
+				baseProgress + (progressRange * (i+1) / len(components)),
+				fmt.Sprintf("Installed %s successfully", packageName),
+				i+1,
+				totalComponents,
+			)
+		}
+
 		// Save progress
 		if err := u.sessionRepo.Save(ctx, session); err != nil {
 			return nil, fmt.Errorf("failed to save session state: %w", err)
@@ -165,6 +217,10 @@ func (u *ExecuteInstallationUseCase) Execute(ctx context.Context, sessionID stri
 	}
 
 	// Move to configuring phase
+	if progressCallback != nil {
+		progressCallback("Configuring", 80, "Applying configuration files", len(components), totalComponents)
+	}
+
 	if err := session.StartConfiguring(); err != nil {
 		if err != installation.ErrInvalidStateTransition {
 			return u.handleInstallationError(ctx, session, fmt.Sprintf("failed to start configuring: %v", err))
@@ -176,6 +232,10 @@ func (u *ExecuteInstallationUseCase) Execute(ctx context.Context, sessionID stri
 	}
 
 	// Move to verifying phase
+	if progressCallback != nil {
+		progressCallback("Verifying", 90, "Verifying installation", len(components), totalComponents)
+	}
+
 	if err := session.StartVerifying(); err != nil {
 		if err != installation.ErrInvalidStateTransition {
 			return u.handleInstallationError(ctx, session, fmt.Sprintf("failed to start verifying: %v", err))
@@ -187,6 +247,10 @@ func (u *ExecuteInstallationUseCase) Execute(ctx context.Context, sessionID stri
 	}
 
 	// Complete the installation
+	if progressCallback != nil {
+		progressCallback("Finalizing", 95, "Cleaning up temporary files", len(components), totalComponents)
+	}
+
 	if err := session.Complete(); err != nil {
 		return u.handleInstallationError(ctx, session, fmt.Sprintf("failed to complete installation: %v", err))
 	}

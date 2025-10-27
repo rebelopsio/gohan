@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/rebelopsio/gohan/internal/application/installation/dto"
+	"github.com/rebelopsio/gohan/internal/application/installation/usecases"
 	"github.com/rebelopsio/gohan/internal/infrastructure/http/handlers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -34,8 +35,8 @@ type MockExecuteInstallationUseCase struct {
 	mock.Mock
 }
 
-func (m *MockExecuteInstallationUseCase) Execute(ctx context.Context, sessionID string) (*dto.InstallationProgressResponse, error) {
-	args := m.Called(ctx, sessionID)
+func (m *MockExecuteInstallationUseCase) Execute(ctx context.Context, sessionID string, progressCallback usecases.ProgressCallback) (*dto.InstallationProgressResponse, error) {
+	args := m.Called(ctx, sessionID, progressCallback)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -170,7 +171,7 @@ func TestInstallationHandler_ExecuteInstallation(t *testing.T) {
 			ComponentsTotal:     1,
 		}
 
-		mockUseCase.On("Execute", mock.Anything, sessionID).
+		mockUseCase.On("Execute", mock.Anything, sessionID, mock.Anything).
 			Return(expectedResponse, nil)
 
 		// Create request with chi URL params
@@ -201,7 +202,7 @@ func TestInstallationHandler_ExecuteInstallation(t *testing.T) {
 
 		sessionID := "non-existent"
 
-		mockUseCase.On("Execute", mock.Anything, sessionID).
+		mockUseCase.On("Execute", mock.Anything, sessionID, mock.Anything).
 			Return(nil, assert.AnError)
 
 		req := httptest.NewRequest(http.MethodPost, "/api/installation/"+sessionID+"/execute", nil)

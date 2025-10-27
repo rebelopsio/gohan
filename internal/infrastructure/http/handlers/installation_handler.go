@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/rebelopsio/gohan/internal/application/installation/dto"
+	"github.com/rebelopsio/gohan/internal/application/installation/usecases"
 )
 
 // StartInstallationUseCase defines the interface for starting an installation
@@ -16,7 +17,7 @@ type StartInstallationUseCase interface {
 
 // ExecuteInstallationUseCase defines the interface for executing an installation
 type ExecuteInstallationUseCase interface {
-	Execute(ctx context.Context, sessionID string) (*dto.InstallationProgressResponse, error)
+	Execute(ctx context.Context, sessionID string, progressCallback usecases.ProgressCallback) (*dto.InstallationProgressResponse, error)
 }
 
 // GetInstallationStatusUseCase defines the interface for getting installation status
@@ -95,8 +96,8 @@ func (h *InstallationHandler) ExecuteInstallation(w http.ResponseWriter, r *http
 		return
 	}
 
-	// Execute use case
-	response, err := h.executeUseCase.Execute(r.Context(), sessionID)
+	// Execute use case (no progress callback for HTTP - use polling via GetStatus instead)
+	response, err := h.executeUseCase.Execute(r.Context(), sessionID, nil)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Failed to execute installation", err.Error())
 		return
