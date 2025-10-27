@@ -1,0 +1,14 @@
+# act configuration file
+# https://github.com/nektos/act
+
+# Use a larger runner image for better compatibility
+-P ubuntu-latest=catthehacker/ubuntu:full-latest
+
+# Enable artifact server
+--artifact-server-path=/tmp/artifacts
+
+# Container options
+--container-options=--security-opt seccomp=unconfined --security-opt apparmor=unconfined
+
+# Verbose output
+-v
