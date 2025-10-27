@@ -3,6 +3,8 @@ package usecases
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -10,6 +12,8 @@ import (
 	"github.com/rebelopsio/gohan/internal/domain/history"
 	"github.com/rebelopsio/gohan/internal/domain/installation"
 	"github.com/rebelopsio/gohan/internal/domain/preflight"
+	"github.com/rebelopsio/gohan/internal/infrastructure/installation/configservice"
+	"github.com/rebelopsio/gohan/internal/infrastructure/installation/templates"
 	preflightTUI "github.com/rebelopsio/gohan/internal/tui/preflight"
 )
 
@@ -43,6 +47,7 @@ type ExecuteInstallationUseCase struct {
 	packageManager     PackageManager
 	historyRecorder    HistoryRecorder
 	preflightValidator PreflightValidator
+	configDeployer     *configservice.ConfigDeployer
 }
 
 // NewExecuteInstallationUseCase creates a new execute installation use case
@@ -54,6 +59,7 @@ func NewExecuteInstallationUseCase(
 	packageManager PackageManager,
 	historyRecorder HistoryRecorder,
 	preflightValidator PreflightValidator,
+	configDeployer *configservice.ConfigDeployer,
 ) *ExecuteInstallationUseCase {
 	return &ExecuteInstallationUseCase{
 		sessionRepo:        sessionRepo,
@@ -63,6 +69,7 @@ func NewExecuteInstallationUseCase(
 		packageManager:     packageManager,
 		historyRecorder:    historyRecorder,
 		preflightValidator: preflightValidator,
+		configDeployer:     configDeployer,
 	}
 }
 
@@ -301,6 +308,13 @@ func (u *ExecuteInstallationUseCase) Execute(ctx context.Context, sessionID stri
 		return nil, fmt.Errorf("failed to save session state: %w", err)
 	}
 
+	// Deploy configuration files if config deployer is available
+	if u.configDeployer != nil {
+		if err := u.deployConfigurations(ctx, session, progressCallback); err != nil {
+			return u.handleInstallationError(ctx, session, fmt.Sprintf("failed to deploy configurations: %v", err))
+		}
+	}
+
 	// Move to verifying phase
 	if progressCallback != nil {
 		progressCallback("Verifying", 90, "Verifying installation", len(components), totalComponents)
@@ -487,4 +501,118 @@ func componentToPackageName(component installation.ComponentName) string {
 	default:
 		return string(component)
 	}
+}
+
+// deployConfigurations deploys configuration files for installed components
+func (u *ExecuteInstallationUseCase) deployConfigurations(
+	ctx context.Context,
+	session *installation.InstallationSession,
+	progressCallback ProgressCallback,
+) error {
+	// Collect system template variables
+	vars, err := templates.CollectSystemVars()
+	if err != nil {
+		return fmt.Errorf("failed to collect system variables: %w", err)
+	}
+
+	// Get config directory for target paths
+	configDir := vars.ConfigDir
+
+	// Build list of configuration files to deploy based on installed components
+	var configFiles []configservice.ConfigurationFile
+
+	for _, installed := range session.InstalledComponents() {
+		component := installed.Component()
+
+		switch component {
+		case installation.ComponentHyprland:
+			// Deploy all Hyprland configuration files
+			hyprConfigs := []string{
+				"hyprland.conf",
+				"bindings.conf",
+				"looknfeel.conf",
+				"autostart.conf",
+				"hypridle.conf",
+				"monitors.conf",
+				"hyprlock.conf",
+				"input.conf",
+			}
+
+			for _, confFile := range hyprConfigs {
+				templatePath := filepath.Join("templates", "hyprland", confFile)
+				targetPath := filepath.Join(configDir, "hypr", confFile)
+
+				// Check if template exists
+				if _, err := os.Stat(templatePath); err == nil {
+					configFiles = append(configFiles, configservice.ConfigurationFile{
+						SourceTemplate: templatePath,
+						TargetPath:     targetPath,
+						Permissions:    0644,
+						BackupBefore:   true,
+					})
+				}
+			}
+
+		case installation.ComponentKitty:
+			templatePath := filepath.Join("templates", "kitty", "kitty.conf")
+			targetPath := filepath.Join(configDir, "kitty", "kitty.conf")
+
+			if _, err := os.Stat(templatePath); err == nil {
+				configFiles = append(configFiles, configservice.ConfigurationFile{
+					SourceTemplate: templatePath,
+					TargetPath:     targetPath,
+					Permissions:    0644,
+					BackupBefore:   true,
+				})
+			}
+		}
+	}
+
+	// Deploy configurations if any are found
+	if len(configFiles) > 0 {
+		// Create progress channel for deployment updates
+		progressChan := make(chan configservice.DeploymentProgress, 10)
+		done := make(chan error, 1)
+
+		go func() {
+			done <- u.configDeployer.DeployConfigurations(ctx, configFiles, vars, progressChan)
+			close(progressChan)
+		}()
+
+		// Monitor progress and report
+		configNum := 0
+		for deployProgress := range progressChan {
+			if deployProgress.Status == "completed" {
+				configNum++
+			}
+
+			if progressCallback != nil {
+				// Map to 85-90% range
+				percent := 85 + (5 * configNum / len(configFiles))
+				progressCallback(
+					"Deploying Configurations",
+					percent,
+					deployProgress.FilePath,
+					len(session.InstalledComponents()),
+					len(session.Configuration().Components()),
+				)
+			}
+		}
+
+		if err := <-done; err != nil {
+			return fmt.Errorf("configuration deployment failed: %w", err)
+		}
+
+		if progressCallback != nil {
+			progressCallback(
+				"Configurations Deployed",
+				90,
+				fmt.Sprintf("Deployed %d configuration files", len(configFiles)),
+				len(session.InstalledComponents()),
+				len(session.Configuration().Components()),
+			)
+		}
+	}
+
+	return nil
 }

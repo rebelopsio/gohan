@@ -2,15 +2,20 @@ package container
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 
 	historyServices "github.com/rebelopsio/gohan/internal/application/history/services"
 	"github.com/rebelopsio/gohan/internal/application/installation/usecases"
 	"github.com/rebelopsio/gohan/internal/config"
 	"github.com/rebelopsio/gohan/internal/domain/installation"
 	historyRepo "github.com/rebelopsio/gohan/internal/infrastructure/history/repository"
+	"github.com/rebelopsio/gohan/internal/infrastructure/installation/backup"
+	"github.com/rebelopsio/gohan/internal/infrastructure/installation/configservice"
 	"github.com/rebelopsio/gohan/internal/infrastructure/installation/packagemanager"
 	"github.com/rebelopsio/gohan/internal/infrastructure/installation/repository"
 	"github.com/rebelopsio/gohan/internal/infrastructure/installation/services"
+	"github.com/rebelopsio/gohan/internal/infrastructure/installation/templates"
 	preflightTUI "github.com/rebelopsio/gohan/internal/tui/preflight"
 )
 
@@ -28,6 +33,7 @@ type Container struct {
 	ProgressEstimator       *services.ProgressEstimator
 	ConfigMerger            *services.ConfigurationMerger
 	PackageManager          *packagemanager.APTManager
+	ConfigDeployer          *configservice.ConfigDeployer
 
 	// Use Cases
 	StartInstallationUseCase   *usecases.StartInstallationUseCase
@@ -102,6 +108,13 @@ func (c *Container) initServices() {
 	} else {
 		c.PackageManager = packagemanager.NewAPTManager()
 	}
+
+	// Configuration deployment services
+	homeDir, _ := os.UserHomeDir()
+	backupDir := filepath.Join(homeDir, ".config", "gohan", "backups")
+	templateEngine := templates.NewTemplateEngine()
+	backupService := backup.NewBackupService(backupDir)
+	c.ConfigDeployer = configservice.NewConfigDeployer(templateEngine, backupService)
 }
 
 // initUseCases initializes all use cases
@@ -116,6 +129,7 @@ func (c *Container) initUseCases() {
 		c.PackageManager, // PackageManager
 		c.HistoryRecordingService, // HistoryRecorder
 		preflightTUI.NewValidationRunner(), // PreflightValidator
+		c.ConfigDeployer,
 	)
 
 	c.GetStatusUseCase = usecases.NewGetInstallationStatusUseCase(c.InstallationRepo)
