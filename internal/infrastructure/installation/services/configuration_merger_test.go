@@ -77,7 +77,7 @@ func TestConfigurationMerger_MergeConfigurations(t *testing.T) {
 		new := mustCreateConfiguration(t, []installation.ComponentSelection{
 			mustCreateComponentSelection(t, installation.ComponentHyprland, "0.35.0"),
 			mustCreateComponentSelection(t, installation.ComponentWaybar, "0.9.20"),
-			mustCreateComponentSelection(t, installation.ComponentRofi, "1.7.5"),
+			mustCreateComponentSelection(t, installation.ComponentFuzzel, "1.7.5"),
 		})
 
 		merged, err := merger.MergeConfigurations(ctx, existing, new)

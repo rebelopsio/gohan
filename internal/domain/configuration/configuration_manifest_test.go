@@ -133,7 +133,7 @@ func TestConfigurationManifest_ComponentCount(t *testing.T) {
 		[]installation.ComponentSelection{
 			createComponentSelection(t, installation.ComponentHyprland, "0.32.0"),
 			createComponentSelection(t, installation.ComponentWaybar, "0.9.0"),
-			createComponentSelection(t, installation.ComponentRofi, "1.3.0"),
+			createComponentSelection(t, installation.ComponentFuzzel, "1.3.0"),
 		},
 		1000000000,
 		false,

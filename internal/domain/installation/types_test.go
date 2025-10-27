@@ -34,8 +34,8 @@ func TestComponentName_IsCore(t *testing.T) {
 			want:      false,
 		},
 		{
-			name:      "Rofi is not core",
-			component: ComponentRofi,
+			name:      "Fuzzel is not core",
+			component: ComponentFuzzel,
 			want:      false,
 		},
 		{

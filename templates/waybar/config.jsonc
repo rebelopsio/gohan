@@ -1,0 +1,169 @@
+{
+  "reload_style_on_change": true,
+  "layer": "top",
+  "position": "top",
+  "spacing": 4,
+  "height": 30,
+  "exclusive": true,
+
+  "modules-left": [
+    "custom/logo",
+    "hyprland/workspaces"
+  ],
+
+  "modules-center": [
+    "clock"
+  ],
+
+  "modules-right": [
+    "tray",
+    "idle_inhibitor",
+    "pulseaudio",
+    "network",
+    "cpu",
+    "memory",
+    "battery",
+    "custom/power"
+  ],
+
+  // =========================================================================
+  // MODULES CONFIGURATION
+  // =========================================================================
+
+  "hyprland/workspaces": {
+    "on-click": "activate",
+    "format": "{icon}",
+    "format-icons": {
+      "1": "1",
+      "2": "2",
+      "3": "3",
+      "4": "4",
+      "5": "5",
+      "6": "6",
+      "7": "7",
+      "8": "8",
+      "9": "9",
+      "10": "10",
+      "active": "󱓻",
+      "default": ""
+    },
+    "persistent-workspaces": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": [],
+      "5": []
+    }
+  },
+
+  "custom/logo": {
+    "format": "  ",
+    "tooltip": false,
+    "on-click": "fuzzel"
+  },
+
+  "clock": {
+    "interval": 60,
+    "format": "{:%a %d %b  %H:%M}",
+    "format-alt": "{:%A, %B %d, %Y  %H:%M:%S}",
+    "tooltip-format": "<tt><small>{calendar}</small></tt>",
+    "calendar": {
+      "mode": "month",
+      "mode-mon-col": 3,
+      "weeks-pos": "right",
+      "on-scroll": 1,
+      "format": {
+        "months": "<span color='#ffead3'><b>{}</b></span>",
+        "days": "<span color='#ecc6d9'><b>{}</b></span>",
+        "weeks": "<span color='#99ffdd'><b>W{}</b></span>",
+        "weekdays": "<span color='#ffcc66'><b>{}</b></span>",
+        "today": "<span color='#ff6699'><b><u>{}</u></b></span>"
+      }
+    },
+    "actions": {
+      "on-click-right": "mode",
+      "on-scroll-up": "shift_up",
+      "on-scroll-down": "shift_down"
+    }
+  },
+
+  "cpu": {
+    "interval": 5,
+    "format": "  {usage}%",
+    "tooltip": true,
+    "on-click": "kitty -e btop"
+  },
+
+  "memory": {
+    "interval": 5,
+    "format": "  {percentage}%",
+    "tooltip-format": "Memory: {used:0.1f}G / {total:0.1f}G\nSwap: {swapUsed:0.1f}G / {swapTotal:0.1f}G",
+    "on-click": "kitty -e btop"
+  },
+
+  "battery": {
+    "interval": 60,
+    "states": {
+      "warning": 30,
+      "critical": 15
+    },
+    "format": "{icon}  {capacity}%",
+    "format-charging": "  {capacity}%",
+    "format-plugged": "  {capacity}%",
+    "format-alt": "{icon}  {time}",
+    "format-icons": ["", "", "", "", ""],
+    "tooltip-format": "{timeTo}\nCapacity: {capacity}%\nHealth: {health}%"
+  },
+
+  "network": {
+    "interval": 3,
+    "format-wifi": "  {signalStrength}%",
+    "format-ethernet": "  Connected",
+    "format-linked": "  {ifname} (No IP)",
+    "format-disconnected": "  Disconnected",
+    "tooltip-format-wifi": "{essid} ({signalStrength}%)\n{frequency} GHz\n{ipaddr}/{cidr}\n⇣{bandwidthDownBytes}  ⇡{bandwidthUpBytes}",
+    "tooltip-format-ethernet": "{ifname}\n{ipaddr}/{cidr}\n⇣{bandwidthDownBytes}  ⇡{bandwidthUpBytes}",
+    "on-click": "nm-connection-editor"
+  },
+
+  "pulseaudio": {
+    "format": "{icon}  {volume}%",
+    "format-bluetooth": "{icon}  {volume}%",
+    "format-muted": "  Muted",
+    "format-icons": {
+      "headphone": "",
+      "hands-free": "",
+      "headset": "",
+      "phone": "",
+      "portable": "",
+      "car": "",
+      "default": ["", "", ""]
+    },
+    "scroll-step": 5,
+    "on-click": "pavucontrol",
+    "on-click-right": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle",
+    "tooltip-format": "{desc}\nVolume: {volume}%"
+  },
+
+  "idle_inhibitor": {
+    "format": "{icon}",
+    "format-icons": {
+      "activated": "",
+      "deactivated": ""
+    },
+    "tooltip": true,
+    "tooltip-format-activated": "Idle inhibitor active\nSystem will not sleep",
+    "tooltip-format-deactivated": "Idle inhibitor inactive\nSystem will sleep normally"
+  },
+
+  "tray": {
+    "icon-size": 18,
+    "spacing": 8
+  },
+
+  "custom/power": {
+    "format": " ",
+    "tooltip": false,
+    "on-click": "wlogout"
+  }
+}

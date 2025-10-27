@@ -176,7 +176,7 @@ func TestStartInstallationUseCase_ConvertComponentName(t *testing.T) {
 		}{
 			{"hyprland", installation.ComponentHyprland},
 			{"waybar", installation.ComponentWaybar},
-			{"rofi", installation.ComponentRofi},
+			{"rofi", installation.ComponentFuzzel},
 			{"kitty", installation.ComponentKitty},
 			{"amd_driver", installation.ComponentAMDDriver},
 			{"nvidia_driver", installation.ComponentNVIDIADriver},

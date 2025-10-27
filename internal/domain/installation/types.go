@@ -42,9 +42,12 @@ const (
 	ComponentHyprland      ComponentName = "hyprland"        // Core compositor
 	ComponentHyprpaper     ComponentName = "hyprpaper"       // Wallpaper utility
 	ComponentHyprlock      ComponentName = "hyprlock"        // Screen locker
+	ComponentHypridle      ComponentName = "hypridle"        // Idle management
 	ComponentWaybar        ComponentName = "waybar"          // Status bar
-	ComponentRofi          ComponentName = "rofi"            // Application launcher
+	ComponentFuzzel        ComponentName = "fuzzel"          // Application launcher (Wayland-native)
 	ComponentKitty         ComponentName = "kitty"           // Terminal emulator
+	ComponentMako          ComponentName = "mako"            // Notification daemon
+	ComponentSwaybg        ComponentName = "swaybg"          // Wallpaper daemon
 	ComponentDefaultConfig ComponentName = "default_config"  // Default configuration files
 	ComponentAMDDriver     ComponentName = "amd_driver"      // AMD GPU drivers
 	ComponentNVIDIADriver  ComponentName = "nvidia_driver"   // NVIDIA GPU drivers

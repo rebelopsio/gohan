@@ -144,7 +144,7 @@ func ConvertComponentName(name string) installation.ComponentName {
 	case "waybar":
 		return installation.ComponentWaybar
 	case "rofi":
-		return installation.ComponentRofi
+		return installation.ComponentFuzzel
 	case "kitty":
 		return installation.ComponentKitty
 	case "default_config":

@@ -3,11 +3,14 @@ package usecases
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/rebelopsio/gohan/internal/application/installation/dto"
 	"github.com/rebelopsio/gohan/internal/domain/history"
 	"github.com/rebelopsio/gohan/internal/domain/installation"
+	"github.com/rebelopsio/gohan/internal/domain/preflight"
+	preflightTUI "github.com/rebelopsio/gohan/internal/tui/preflight"
 )
 
 // PackageManager defines the interface for installing packages
@@ -21,17 +24,25 @@ type HistoryRecorder interface {
 	RecordInstallation(ctx context.Context, session *installation.InstallationSession) (history.RecordID, error)
 }
 
+// PreflightValidator defines the interface for running preflight validation checks
+type PreflightValidator interface {
+	Run(ctx context.Context) error
+	Session() *preflight.ValidationSession
+	Progress() <-chan preflightTUI.ProgressUpdate
+}
+
 // ProgressCallback is called during installation to report progress
 type ProgressCallback func(phase string, percent int, message string, componentsInstalled, componentsTotal int)
 
 // ExecuteInstallationUseCase handles executing an installation session
 type ExecuteInstallationUseCase struct {
-	sessionRepo       installation.InstallationSessionRepository
-	conflictResolver  installation.ConflictResolver
-	progressEstimator installation.ProgressEstimator
-	configMerger      installation.ConfigurationMerger
-	packageManager    PackageManager
-	historyRecorder   HistoryRecorder
+	sessionRepo        installation.InstallationSessionRepository
+	conflictResolver   installation.ConflictResolver
+	progressEstimator  installation.ProgressEstimator
+	configMerger       installation.ConfigurationMerger
+	packageManager     PackageManager
+	historyRecorder    HistoryRecorder
+	preflightValidator PreflightValidator
 }
 
 // NewExecuteInstallationUseCase creates a new execute installation use case
@@ -42,14 +53,16 @@ func NewExecuteInstallationUseCase(
 	configMerger installation.ConfigurationMerger,
 	packageManager PackageManager,
 	historyRecorder HistoryRecorder,
+	preflightValidator PreflightValidator,
 ) *ExecuteInstallationUseCase {
 	return &ExecuteInstallationUseCase{
-		sessionRepo:       sessionRepo,
-		conflictResolver:  conflictResolver,
-		progressEstimator: progressEstimator,
-		configMerger:      configMerger,
-		packageManager:    packageManager,
-		historyRecorder:   historyRecorder,
+		sessionRepo:        sessionRepo,
+		conflictResolver:   conflictResolver,
+		progressEstimator:  progressEstimator,
+		configMerger:       configMerger,
+		packageManager:     packageManager,
+		historyRecorder:    historyRecorder,
+		preflightValidator: preflightValidator,
 	}
 }
 
@@ -65,9 +78,66 @@ func (u *ExecuteInstallationUseCase) Execute(ctx context.Context, sessionID stri
 	// Get total components for progress reporting
 	totalComponents := len(session.Configuration().Components())
 
+	// Step 1: Run preflight checks (0-15%)
+	if progressCallback != nil {
+		progressCallback("Running Preflight Checks", 0, "Initializing system validation", 0, totalComponents)
+	}
+
+	// Run preflight checks in a goroutine and map progress
+	preflightDone := make(chan struct{})
+	go func() {
+		defer close(preflightDone)
+		_ = u.preflightValidator.Run(ctx)
+	}()
+
+	// Monitor preflight progress and report it
+	checkNum := 0
+	totalChecks := 5 // Debian, GPU, Disk, Connectivity, Repos
+	for update := range u.preflightValidator.Progress() {
+		checkNum++
+		// Map preflight progress to 0-15% range
+		percent := (checkNum * 15) / totalChecks
+
+		if progressCallback != nil {
+			progressCallback(
+				"Running Preflight Checks",
+				percent,
+				update.Message,
+				0,
+				totalComponents,
+			)
+		}
+	}
+
+	// Wait for preflight to complete
+	<-preflightDone
+
+	// Check if we can proceed
+	preflightSession := u.preflightValidator.Session()
+	if !preflightSession.CanProceed() {
+		// Installation is blocked - return error with guidance
+		return u.handlePreflightBlockers(ctx, session, preflightSession)
+	}
+
+	// Report warnings if any
+	if preflightSession.HasWarnings() && progressCallback != nil {
+		warnings := preflightSession.WarningResults()
+		warningMsgs := make([]string, 0, len(warnings))
+		for _, w := range warnings {
+			warningMsgs = append(warningMsgs, w.FormatMessage())
+		}
+		progressCallback(
+			"Preflight Warnings",
+			15,
+			fmt.Sprintf("%d warnings detected: %s", len(warnings), strings.Join(warningMsgs, "; ")),
+			0,
+			totalComponents,
+		)
+	}
+
 	// Report initial progress
 	if progressCallback != nil {
-		progressCallback("Starting Preparation", 0, "Initializing installation session", 0, totalComponents)
+		progressCallback("Starting Preparation", 15, "Preflight checks passed", 0, totalComponents)
 	}
 
 	// Create a system snapshot before starting
@@ -75,7 +145,7 @@ func (u *ExecuteInstallationUseCase) Execute(ctx context.Context, sessionID stri
 	config := session.Configuration()
 
 	if progressCallback != nil {
-		progressCallback("Creating Snapshot", 5, "Creating system snapshot", 0, totalComponents)
+		progressCallback("Creating Snapshot", 20, "Creating system snapshot", 0, totalComponents)
 	}
 
 	snapshot, err := installation.NewSystemSnapshot(
@@ -102,7 +172,7 @@ func (u *ExecuteInstallationUseCase) Execute(ctx context.Context, sessionID stri
 
 	// Detect conflicts
 	if progressCallback != nil {
-		progressCallback("Checking Requirements", 10, "Detecting package conflicts", 0, totalComponents)
+		progressCallback("Checking Requirements", 25, "Detecting package conflicts", 0, totalComponents)
 	}
 
 	conflicts, err := u.conflictResolver.DetectConflicts(ctx, config.Components())
@@ -113,7 +183,7 @@ func (u *ExecuteInstallationUseCase) Execute(ctx context.Context, sessionID stri
 	// Resolve conflicts if any
 	if len(conflicts) > 0 {
 		if progressCallback != nil {
-			progressCallback("Resolving Conflicts", 15, fmt.Sprintf("Resolving %d package conflicts", len(conflicts)), 0, totalComponents)
+			progressCallback("Resolving Conflicts", 30, fmt.Sprintf("Resolving %d package conflicts", len(conflicts)), 0, totalComponents)
 		}
 
 		for _, conflict := range conflicts {
@@ -142,10 +212,10 @@ func (u *ExecuteInstallationUseCase) Execute(ctx context.Context, sessionID stri
 		packageName := componentToPackageName(comp.Component())
 		version := comp.Version()
 
-		// Calculate progress percentage (20-80% range for installations)
-		// Each component gets equal portion of the 60% range
-		baseProgress := 20
-		progressRange := 60
+		// Calculate progress percentage (35-80% range for installations)
+		// Each component gets equal portion of the 45% range
+		baseProgress := 35
+		progressRange := 45
 		componentProgress := baseProgress + (progressRange * i / len(components))
 
 		if progressCallback != nil {
@@ -218,7 +288,7 @@ func (u *ExecuteInstallationUseCase) Execute(ctx context.Context, sessionID stri
 
 	// Move to configuring phase
 	if progressCallback != nil {
-		progressCallback("Configuring", 80, "Applying configuration files", len(components), totalComponents)
+		progressCallback("Configuring", 85, "Applying configuration files", len(components), totalComponents)
 	}
 
 	if err := session.StartConfiguring(); err != nil {
@@ -301,6 +371,52 @@ func (u *ExecuteInstallationUseCase) Execute(ctx context.Context, sessionID stri
 	return response, nil
 }
 
+// handlePreflightBlockers handles blocking preflight check failures
+func (u *ExecuteInstallationUseCase) handlePreflightBlockers(
+	ctx context.Context,
+	session *installation.InstallationSession,
+	preflightSession *preflight.ValidationSession,
+) (*dto.InstallationProgressResponse, error) {
+	blockers := preflightSession.BlockingResults()
+
+	// Build error message with all blocking issues
+	var errorParts []string
+	errorParts = append(errorParts, fmt.Sprintf("Installation blocked by %d preflight check failure(s):", len(blockers)))
+
+	for _, blocker := range blockers {
+		errorParts = append(errorParts, fmt.Sprintf("  - %s", blocker.FormatMessage()))
+		if blocker.Guidance().Message() != "" {
+			errorParts = append(errorParts, fmt.Sprintf("    Fix: %s", blocker.Guidance().Message()))
+		}
+	}
+
+	errorMessage := strings.Join(errorParts, "\n")
+
+	// Mark session as failed
+	_ = session.Fail(errorMessage)
+	_ = u.sessionRepo.Save(ctx, session)
+
+	// Record failed installation to history
+	if u.historyRecorder != nil {
+		_, _ = u.historyRecorder.RecordInstallation(ctx, session)
+	}
+
+	// Return error response
+	response := &dto.InstallationProgressResponse{
+		SessionID:           session.ID(),
+		Status:              "failed",
+		CurrentPhase:        "Preflight Checks",
+		PercentComplete:     0,
+		Message:             fmt.Sprintf("Preflight checks failed: %d blocker(s) detected", len(blockers)),
+		EstimatedRemaining:  "0s",
+		ComponentsInstalled: 0,
+		ComponentsTotal:     len(session.Configuration().Components()),
+	}
+
+	// Return error to stop installation
+	return response, fmt.Errorf("preflight checks failed: %d blocker(s) detected - %s", len(blockers), errorMessage)
+}
+
 // handleInstallationError marks the session as failed and returns an error response
 func (u *ExecuteInstallationUseCase) handleInstallationError(
 	ctx context.Context,
@@ -356,7 +472,7 @@ func componentToPackageName(component installation.ComponentName) string {
 		return "hyprlock"
 	case installation.ComponentWaybar:
 		return "waybar"
-	case installation.ComponentRofi:
+	case installation.ComponentFuzzel:
 		return "rofi"
 	case installation.ComponentKitty:
 		return "kitty"

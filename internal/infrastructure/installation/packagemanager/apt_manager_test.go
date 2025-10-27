@@ -223,3 +223,263 @@ func TestAPTManager_GetPackageInfo(t *testing.T) {
 		assert.NotEmpty(t, info.Version)
 	})
 }
+
+// ========================================
+// Phase 3.1: Batch Installation Tests
+// ========================================
+
+func TestAPTManager_ArePackagesInstalled(t *testing.T) {
+	tests := []struct {
+		name     string
+		packages []string
+		wantErr  bool
+	}{
+		{
+			name:     "empty package list",
+			packages: []string{},
+			wantErr:  false,
+		},
+		{
+			name:     "single installed package",
+			packages: []string{"coreutils"},
+			wantErr:  false,
+		},
+		{
+			name:     "multiple packages - mixed installed and not installed",
+			packages: []string{"coreutils", "definitely-not-installed-xyz"},
+			wantErr:  false,
+		},
+		{
+			name:     "all packages not installed",
+			packages: []string{"fake-package-1", "fake-package-2"},
+			wantErr:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			manager := packagemanager.NewAPTManager()
+			ctx := context.Background()
+
+			result, err := manager.ArePackagesInstalled(ctx, tt.packages)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.NotNil(t, result)
+			assert.Equal(t, len(tt.packages), len(result), "Result map should have entry for each package")
+
+			// Verify specific expectations
+			if tt.name == "single installed package" {
+				assert.True(t, result["coreutils"], "coreutils should be marked as installed")
+			}
+
+			if tt.name == "multiple packages - mixed installed and not installed" {
+				assert.True(t, result["coreutils"], "coreutils should be installed")
+				assert.False(t, result["definitely-not-installed-xyz"], "fake package should not be installed")
+			}
+		})
+	}
+}
+
+func TestAPTManager_InstallPackages(t *testing.T) {
+	tests := []struct {
+		name         string
+		packages     []string
+		wantErr      bool
+		validateFunc func(*testing.T, []packagemanager.PackageProgress)
+	}{
+		{
+			name:     "empty package list",
+			packages: []string{},
+			wantErr:  false,
+			validateFunc: func(t *testing.T, progress []packagemanager.PackageProgress) {
+				assert.Empty(t, progress, "No progress events for empty list")
+			},
+		},
+		{
+			name:     "single package",
+			packages: []string{"hyprland"},
+			wantErr:  false,
+			validateFunc: func(t *testing.T, progress []packagemanager.PackageProgress) {
+				assert.NotEmpty(t, progress, "Should have progress events")
+				// Should have at least: started, completed
+				assert.GreaterOrEqual(t, len(progress), 2)
+			},
+		},
+		{
+			name:     "multiple packages",
+			packages: []string{"hyprland", "waybar", "kitty"},
+			wantErr:  false,
+			validateFunc: func(t *testing.T, progress []packagemanager.PackageProgress) {
+				assert.NotEmpty(t, progress)
+				// Each package should have progress events
+				packageNames := make(map[string]bool)
+				for _, p := range progress {
+					packageNames[p.PackageName] = true
+				}
+				assert.Equal(t, 3, len(packageNames), "Should have progress for all 3 packages")
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			manager := packagemanager.NewAPTManagerDryRun() // Dry-run mode for testing
+			ctx := context.Background()
+
+			// Create progress channel
+			progressChan := make(chan packagemanager.PackageProgress, 100)
+			var collectedProgress []packagemanager.PackageProgress
+
+			// Collect progress in goroutine
+			done := make(chan struct{})
+			go func() {
+				for p := range progressChan {
+					collectedProgress = append(collectedProgress, p)
+				}
+				close(done)
+			}()
+
+			// Execute installation
+			err := manager.InstallPackages(ctx, tt.packages, progressChan)
+			close(progressChan)
+			<-done // Wait for collection to finish
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
+
+			if tt.validateFunc != nil {
+				tt.validateFunc(t, collectedProgress)
+			}
+		})
+	}
+}
+
+func TestAPTManager_InstallPackages_ProgressReporting(t *testing.T) {
+	t.Run("reports progress for each package", func(t *testing.T) {
+		manager := packagemanager.NewAPTManagerDryRun()
+		ctx := context.Background()
+
+		packages := []string{"hyprland", "waybar"}
+		progressChan := make(chan packagemanager.PackageProgress, 100)
+
+		var progress []packagemanager.PackageProgress
+		done := make(chan struct{})
+		go func() {
+			for p := range progressChan {
+				progress = append(progress, p)
+			}
+			close(done)
+		}()
+
+		err := manager.InstallPackages(ctx, packages, progressChan)
+		close(progressChan)
+		<-done
+
+		require.NoError(t, err)
+
+		// Verify progress structure
+		assert.NotEmpty(t, progress)
+
+		// Each package should have: started, installing, completed
+		hyprlandEvents := 0
+		waybarEvents := 0
+
+		for _, p := range progress {
+			assert.NotEmpty(t, p.PackageName, "Progress should have package name")
+			assert.NotEmpty(t, p.Status, "Progress should have status")
+
+			if p.PackageName == "hyprland" {
+				hyprlandEvents++
+			}
+			if p.PackageName == "waybar" {
+				waybarEvents++
+			}
+		}
+
+		assert.Greater(t, hyprlandEvents, 0, "Should have progress for hyprland")
+		assert.Greater(t, waybarEvents, 0, "Should have progress for waybar")
+	})
+
+	t.Run("handles context cancellation", func(t *testing.T) {
+		manager := packagemanager.NewAPTManagerDryRun()
+		ctx, cancel := context.WithCancel(context.Background())
+
+		packages := []string{"pkg1", "pkg2", "pkg3"}
+		progressChan := make(chan packagemanager.PackageProgress, 100)
+
+		// Cancel immediately
+		cancel()
+
+		err := manager.InstallPackages(ctx, packages, progressChan)
+		close(progressChan)
+
+		assert.Error(t, err, "Should return error when context is cancelled")
+		assert.Contains(t, err.Error(), "context", "Error should mention context")
+	})
+}
+
+func TestAPTManager_InstallProfile(t *testing.T) {
+	tests := []struct {
+		name    string
+		profile string
+		wantErr bool
+	}{
+		{
+			name:    "minimal profile",
+			profile: "minimal",
+			wantErr: false,
+		},
+		{
+			name:    "recommended profile",
+			profile: "recommended",
+			wantErr: false,
+		},
+		{
+			name:    "full profile",
+			profile: "full",
+			wantErr: false,
+		},
+		{
+			name:    "unknown profile",
+			profile: "invalid-profile",
+			wantErr: true,
+		},
+		{
+			name:    "empty profile name",
+			profile: "",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			manager := packagemanager.NewAPTManagerDryRun()
+			ctx := context.Background()
+
+			progressChan := make(chan packagemanager.PackageProgress, 100)
+			go func() {
+				// Drain progress channel
+				for range progressChan {
+				}
+			}()
+
+			err := manager.InstallProfile(ctx, tt.profile, progressChan)
+			close(progressChan)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}

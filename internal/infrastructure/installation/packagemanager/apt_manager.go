@@ -24,6 +24,22 @@ type PackageInfo struct {
 	Description  string
 }
 
+// PackageProgress represents progress for a single package installation
+type PackageProgress struct {
+	PackageName    string
+	Status         string // "started", "installing", "completed", "failed"
+	PercentComplete float64
+	Error          error
+}
+
+// ProgressStatus constants for package installation
+const (
+	StatusStarted    = "started"
+	StatusInstalling = "installing"
+	StatusCompleted  = "completed"
+	StatusFailed     = "failed"
+)
+
 // NewAPTManager creates a new APT package manager
 func NewAPTManager() *APTManager {
 	return &APTManager{
@@ -199,7 +215,7 @@ func componentToPackageName(component installation.ComponentName) string {
 		return "hyprlock"
 	case installation.ComponentWaybar:
 		return "waybar"
-	case installation.ComponentRofi:
+	case installation.ComponentFuzzel:
 		return "rofi"
 	case installation.ComponentKitty:
 		return "kitty"
@@ -247,4 +263,115 @@ func (a *APTManager) checkPackageConflicts(ctx context.Context, packageName, dpk
 	}
 
 	return conflicts
+}
+
+// ========================================
+// Phase 3.1: Batch Installation Methods
+// ========================================
+
+// ArePackagesInstalled checks if multiple packages are installed
+// Returns a map of package name to installation status
+func (a *APTManager) ArePackagesInstalled(ctx context.Context, packages []string) (map[string]bool, error) {
+	result := make(map[string]bool)
+
+	for _, pkg := range packages {
+		installed, err := a.IsPackageInstalled(ctx, pkg)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check package %s: %w", pkg, err)
+		}
+		result[pkg] = installed
+	}
+
+	return result, nil
+}
+
+// InstallPackages installs multiple packages with progress reporting
+// Progress is reported via the progressChan for each package
+func (a *APTManager) InstallPackages(ctx context.Context, packages []string, progressChan chan<- PackageProgress) error {
+	if len(packages) == 0 {
+		return nil
+	}
+
+	// Check context before starting
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("context error before installation: %w", err)
+	}
+
+	totalPackages := len(packages)
+
+	for i, pkg := range packages {
+		// Check context before each package
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("context cancelled during installation: %w", err)
+		}
+
+		percentComplete := float64(i) / float64(totalPackages) * 100
+
+		// Report started
+		if progressChan != nil {
+			progressChan <- PackageProgress{
+				PackageName:     pkg,
+				Status:          StatusStarted,
+				PercentComplete: percentComplete,
+			}
+		}
+
+		// Report installing
+		if progressChan != nil {
+			progressChan <- PackageProgress{
+				PackageName:     pkg,
+				Status:          StatusInstalling,
+				PercentComplete: percentComplete + (50.0 / float64(totalPackages)),
+			}
+		}
+
+		// Install the package
+		err := a.InstallPackage(ctx, pkg, "")
+		if err != nil {
+			// Report failure
+			if progressChan != nil {
+				progressChan <- PackageProgress{
+					PackageName:     pkg,
+					Status:          StatusFailed,
+					PercentComplete: percentComplete,
+					Error:           err,
+				}
+			}
+			return fmt.Errorf("failed to install %s: %w", pkg, err)
+		}
+
+		// Report completed
+		if progressChan != nil {
+			progressChan <- PackageProgress{
+				PackageName:     pkg,
+				Status:          StatusCompleted,
+				PercentComplete: float64(i+1) / float64(totalPackages) * 100,
+			}
+		}
+	}
+
+	return nil
+}
+
+// InstallProfile installs packages for a specific profile (minimal/recommended/full)
+func (a *APTManager) InstallProfile(ctx context.Context, profileName string, progressChan chan<- PackageProgress) error {
+	if profileName == "" {
+		return errors.New("profile name cannot be empty")
+	}
+
+	// Get packages for the profile
+	var packages []string
+	switch profileName {
+	case "minimal":
+		packages = installation.GetMinimalProfile().Packages
+	case "recommended":
+		packages = installation.GetRecommendedProfile().Packages
+	case "full":
+		packages = installation.GetFullProfile().Packages
+	default:
+		return fmt.Errorf("unknown profile: %s", profileName)
+	}
+
+	// Install packages with progress reporting
+	return a.InstallPackages(ctx, packages, progressChan)
 }

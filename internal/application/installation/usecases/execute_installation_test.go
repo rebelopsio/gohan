@@ -7,6 +7,8 @@ import (
 
 	"github.com/rebelopsio/gohan/internal/application/installation/usecases"
 	"github.com/rebelopsio/gohan/internal/domain/installation"
+	"github.com/rebelopsio/gohan/internal/domain/preflight"
+	preflightTUI "github.com/rebelopsio/gohan/internal/tui/preflight"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -114,6 +116,36 @@ func (m *MockPackageManager) IsPackageInstalled(ctx context.Context, packageName
 	return args.Bool(0), args.Error(1)
 }
 
+// MockPreflightValidator is a mock implementation of preflight validator
+type MockPreflightValidator struct {
+	mock.Mock
+	progressChan chan preflightTUI.ProgressUpdate
+	session      *preflight.ValidationSession
+}
+
+func NewMockPreflightValidator() *MockPreflightValidator {
+	session := preflight.NewValidationSession()
+	session.Complete() // Mark as complete with no failures
+	return &MockPreflightValidator{
+		progressChan: make(chan preflightTUI.ProgressUpdate),
+		session:      session,
+	}
+}
+
+func (m *MockPreflightValidator) Run(ctx context.Context) error {
+	args := m.Called(ctx)
+	close(m.progressChan) // Close channel to signal completion
+	return args.Error(0)
+}
+
+func (m *MockPreflightValidator) Session() *preflight.ValidationSession {
+	return m.session
+}
+
+func (m *MockPreflightValidator) Progress() <-chan preflightTUI.ProgressUpdate {
+	return m.progressChan
+}
+
 func TestExecuteInstallationUseCase_Execute(t *testing.T) {
 	t.Run("successfully executes installation with no conflicts", func(t *testing.T) {
 		// Create a valid installation session
@@ -143,6 +175,7 @@ func TestExecuteInstallationUseCase_Execute(t *testing.T) {
 		mockProgressEstimator := new(MockProgressEstimator)
 		mockConfigMerger := new(MockConfigurationMerger)
 		mockPkgManager := new(MockPackageManager)
+		mockPreflight := NewMockPreflightValidator()
 
 		// Mock expectations
 		mockRepo.On("FindByID", mock.Anything, session.ID()).
@@ -161,6 +194,8 @@ func TestExecuteInstallationUseCase_Execute(t *testing.T) {
 		mockPkgManager.On("InstallPackage", mock.Anything, "hyprland", "0.35.0").
 			Return(nil)
 
+		mockPreflight.On("Run", mock.Anything).Return(nil)
+
 		// Execute use case
 		useCase := usecases.NewExecuteInstallationUseCase(
 			mockRepo,
@@ -169,6 +204,7 @@ func TestExecuteInstallationUseCase_Execute(t *testing.T) {
 			mockConfigMerger,
 			mockPkgManager,
 			nil, // historyRecorder not needed for this test
+			mockPreflight,
 		)
 		ctx := context.Background()
 
@@ -216,6 +252,7 @@ func TestExecuteInstallationUseCase_Execute(t *testing.T) {
 		mockProgressEstimator := new(MockProgressEstimator)
 		mockConfigMerger := new(MockConfigurationMerger)
 		mockPkgManager := new(MockPackageManager)
+		mockPreflight := NewMockPreflightValidator()
 
 		mockRepo.On("FindByID", mock.Anything, session.ID()).
 			Return(session, nil)
@@ -238,6 +275,8 @@ func TestExecuteInstallationUseCase_Execute(t *testing.T) {
 		mockPkgManager.On("InstallPackage", mock.Anything, "hyprland", "0.35.0").
 			Return(nil)
 
+		mockPreflight.On("Run", mock.Anything).Return(nil)
+
 		// Execute use case
 		useCase := usecases.NewExecuteInstallationUseCase(
 			mockRepo,
@@ -246,6 +285,7 @@ func TestExecuteInstallationUseCase_Execute(t *testing.T) {
 			mockConfigMerger,
 			mockPkgManager,
 			nil, // historyRecorder not needed for this test
+			mockPreflight,
 		)
 		ctx := context.Background()
 
@@ -262,6 +302,7 @@ func TestExecuteInstallationUseCase_Execute(t *testing.T) {
 		mockProgressEstimator := new(MockProgressEstimator)
 		mockConfigMerger := new(MockConfigurationMerger)
 		mockPkgManager := new(MockPackageManager)
+		mockPreflight := NewMockPreflightValidator()
 
 		mockRepo.On("FindByID", mock.Anything, "nonexistent-id").
 			Return(nil, installation.ErrSessionNotFound)
@@ -273,6 +314,7 @@ func TestExecuteInstallationUseCase_Execute(t *testing.T) {
 			mockConfigMerger,
 			mockPkgManager,
 			nil, // historyRecorder not needed for this test
+			mockPreflight,
 		)
 		ctx := context.Background()
 
@@ -308,6 +350,7 @@ func TestExecuteInstallationUseCase_Execute(t *testing.T) {
 		mockProgressEstimator := new(MockProgressEstimator)
 		mockConfigMerger := new(MockConfigurationMerger)
 		mockPkgManager := new(MockPackageManager)
+		mockPreflight := NewMockPreflightValidator()
 
 		mockRepo.On("FindByID", mock.Anything, session.ID()).
 			Return(session, nil)
@@ -327,6 +370,8 @@ func TestExecuteInstallationUseCase_Execute(t *testing.T) {
 		mockPkgManager.On("InstallPackage", mock.Anything, "hyprland", "0.35.0").
 			Return(installErr)
 
+		mockPreflight.On("Run", mock.Anything).Return(nil)
+
 		useCase := usecases.NewExecuteInstallationUseCase(
 			mockRepo,
 			mockConflictResolver,
@@ -334,6 +379,7 @@ func TestExecuteInstallationUseCase_Execute(t *testing.T) {
 			mockConfigMerger,
 			mockPkgManager,
 			nil, // historyRecorder not needed for this test
+			mockPreflight,
 		)
 		ctx := context.Background()
 
@@ -343,6 +389,100 @@ func TestExecuteInstallationUseCase_Execute(t *testing.T) {
 		assert.Equal(t, "failed", response.Status)
 		mockPkgManager.AssertExpectations(t)
 	})
+
+	t.Run("blocks installation when preflight checks fail", func(t *testing.T) {
+		// Create a valid installation session
+		components, err := createTestComponents()
+		require.NoError(t, err)
+
+		diskSpace, err := installation.NewDiskSpace(
+			100*uint64(installation.GB),
+			10*uint64(installation.GB),
+		)
+		require.NoError(t, err)
+
+		config, err := installation.NewInstallationConfiguration(
+			components,
+			nil,
+			diskSpace,
+			false,
+		)
+		require.NoError(t, err)
+
+		session, err := installation.NewInstallationSession(config)
+		require.NoError(t, err)
+
+		// Setup mocks
+		mockRepo := new(MockInstallationSessionRepository)
+		mockConflictResolver := new(MockConflictResolver)
+		mockProgressEstimator := new(MockProgressEstimator)
+		mockConfigMerger := new(MockConfigurationMerger)
+		mockPkgManager := new(MockPackageManager)
+
+		// Create a mock preflight that will fail with a blocker
+		mockPreflight := &MockPreflightValidator{
+			Mock:         mock.Mock{},
+			progressChan: make(chan preflightTUI.ProgressUpdate),
+			session:      createFailedPreflightSession(),
+		}
+
+		mockRepo.On("FindByID", mock.Anything, session.ID()).
+			Return(session, nil)
+		mockRepo.On("Save", mock.Anything, mock.AnythingOfType("*installation.InstallationSession")).
+			Return(nil)
+
+		mockPreflight.On("Run", mock.Anything).Return(nil)
+
+		// Execute use case
+		useCase := usecases.NewExecuteInstallationUseCase(
+			mockRepo,
+			mockConflictResolver,
+			mockProgressEstimator,
+			mockConfigMerger,
+			mockPkgManager,
+			nil, // historyRecorder not needed for this test
+			mockPreflight,
+		)
+		ctx := context.Background()
+
+		response, err := useCase.Execute(ctx, session.ID(), nil)
+
+		// Should return an error because preflight failed
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "preflight checks failed")
+		assert.NotNil(t, response)
+		assert.Equal(t, "failed", response.Status)
+		assert.Equal(t, "Preflight Checks", response.CurrentPhase)
+	})
+}
+
+// createFailedPreflightSession creates a preflight session with a blocking failure
+func createFailedPreflightSession() *preflight.ValidationSession {
+	session := preflight.NewValidationSession()
+
+	// Create guidance for fixing the issue
+	guidance := preflight.NewUserGuidance(
+		"Debian version check failed",
+		"Debian noble is not supported. Gohan requires Debian Sid or Trixie.",
+		[]string{"Upgrade to Debian Sid or Trixie"},
+		"https://www.debian.org/releases/",
+	)
+
+	// Create a blocking validation result (critical severity)
+	result := preflight.NewValidationResult(
+		preflight.RequirementDebianVersion,
+		preflight.StatusFail,
+		preflight.SeverityCritical,
+		"noble",
+		"sid or trixie",
+		guidance,
+	)
+
+	// Add the result to the session
+	session.AddResult(result)
+	session.Complete()
+
+	return session
 }
 
 // Helper function to create test components

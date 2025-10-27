@@ -11,6 +11,7 @@ import (
 	"github.com/rebelopsio/gohan/internal/infrastructure/installation/packagemanager"
 	"github.com/rebelopsio/gohan/internal/infrastructure/installation/repository"
 	"github.com/rebelopsio/gohan/internal/infrastructure/installation/services"
+	preflightTUI "github.com/rebelopsio/gohan/internal/tui/preflight"
 )
 
 // Container holds all dependencies for the application
@@ -114,6 +115,7 @@ func (c *Container) initUseCases() {
 		c.ConfigMerger,
 		c.PackageManager, // PackageManager
 		c.HistoryRecordingService, // HistoryRecorder
+		preflightTUI.NewValidationRunner(), // PreflightValidator
 	)
 
 	c.GetStatusUseCase = usecases.NewGetInstallationStatusUseCase(c.InstallationRepo)
