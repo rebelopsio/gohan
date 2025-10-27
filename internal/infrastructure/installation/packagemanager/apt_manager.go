@@ -85,7 +85,7 @@ func (a *APTManager) ResolveConflict(ctx context.Context, conflict installation.
 }
 
 // InstallPackage installs a package using APT
-func (a *APTManager) InstallPackage(ctx context.Context, packageName string) error {
+func (a *APTManager) InstallPackage(ctx context.Context, packageName, version string) error {
 	if packageName == "" {
 		return errors.New("package name cannot be empty")
 	}
@@ -94,10 +94,16 @@ func (a *APTManager) InstallPackage(ctx context.Context, packageName string) err
 		return nil
 	}
 
-	cmd := exec.CommandContext(ctx, "apt-get", "install", "-y", packageName)
+	// If version is specified, append it to package name
+	fullPackageName := packageName
+	if version != "" {
+		fullPackageName = fmt.Sprintf("%s=%s", packageName, version)
+	}
+
+	cmd := exec.CommandContext(ctx, "apt-get", "install", "-y", fullPackageName)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("failed to install package %s: %w\nOutput: %s", packageName, err, string(output))
+		return fmt.Errorf("failed to install package %s: %w\nOutput: %s", fullPackageName, err, string(output))
 	}
 
 	return nil

@@ -104,21 +104,29 @@ func TestAPTManager_InstallPackage(t *testing.T) {
 		manager := packagemanager.NewAPTManager()
 		ctx := context.Background()
 
-		err := manager.InstallPackage(ctx, "")
+		err := manager.InstallPackage(ctx, "", "1.0.0")
 
 		assert.Error(t, err)
 	})
 
-	t.Run("accepts valid package name", func(t *testing.T) {
-		manager := packagemanager.NewAPTManager()
+	t.Run("accepts valid package name without version", func(t *testing.T) {
+		manager := packagemanager.NewAPTManagerDryRun()
 		ctx := context.Background()
 
-		// This will fail in test environment without sudo, but validates input
-		err := manager.InstallPackage(ctx, "hyprland")
+		// Dry-run mode won't actually install
+		err := manager.InstallPackage(ctx, "hyprland", "")
 
-		// Either succeeds or fails with execution error (not validation error)
-		// We can't actually install in tests, so either outcome is acceptable
-		_ = err
+		assert.NoError(t, err)
+	})
+
+	t.Run("accepts valid package name with version", func(t *testing.T) {
+		manager := packagemanager.NewAPTManagerDryRun()
+		ctx := context.Background()
+
+		// Dry-run mode won't actually install
+		err := manager.InstallPackage(ctx, "hyprland", "0.35.0")
+
+		assert.NoError(t, err)
 	})
 }
 
