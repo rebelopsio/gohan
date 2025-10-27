@@ -108,9 +108,6 @@ Example:
 }
 
 func init() {
-	// Add history command to root
-	rootCmd.AddCommand(historyCmd)
-
 	// Add subcommands to history
 	historyCmd.AddCommand(historyListCmd)
 	historyCmd.AddCommand(historyShowCmd)
