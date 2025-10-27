@@ -46,3 +46,16 @@ type ConfigurationMerger interface {
 	// ShouldBackupExisting determines if existing configuration should be backed up
 	ShouldBackupExisting(ctx context.Context, path string) (bool, error)
 }
+
+// InstallationSessionRepository is a repository for persisting installation sessions
+// This is defined as an interface (port) for hexagonal architecture
+type InstallationSessionRepository interface {
+	// Save persists an installation session
+	Save(ctx context.Context, session *InstallationSession) error
+
+	// FindByID retrieves an installation session by its ID
+	FindByID(ctx context.Context, id string) (*InstallationSession, error)
+
+	// List retrieves all installation sessions
+	List(ctx context.Context) ([]*InstallationSession, error)
+}

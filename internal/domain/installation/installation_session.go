@@ -33,6 +33,59 @@ func NewInstallationSession(configuration InstallationConfiguration) (*Installat
 	}, nil
 }
 
+// ReconstructInstallationSession reconstructs an installation session from persistent storage
+// This is a domain factory method that allows repositories to rebuild the aggregate
+// while maintaining encapsulation and enforcing invariants
+func ReconstructInstallationSession(
+	id string,
+	configuration InstallationConfiguration,
+	status InstallationStatus,
+	snapshot *SystemSnapshot,
+	installedComponents []*InstalledComponent,
+	startedAt time.Time,
+	completedAt time.Time,
+	failureReason string,
+) (*InstallationSession, error) {
+	// Validate reconstruction parameters
+	if id == "" {
+		return nil, fmt.Errorf("session ID cannot be empty")
+	}
+
+	// Basic validation of configuration (was validated when initially created)
+	if configuration.ComponentCount() == 0 {
+		return nil, fmt.Errorf("configuration must have at least one component")
+	}
+
+	if startedAt.IsZero() {
+		return nil, fmt.Errorf("started time cannot be zero")
+	}
+
+	// Validate terminal state invariants
+	if status == StatusCompleted && completedAt.IsZero() {
+		return nil, fmt.Errorf("completed session must have completed time")
+	}
+
+	if status == StatusFailed && failureReason == "" {
+		return nil, fmt.Errorf("failed session must have failure reason")
+	}
+
+	// Ensure non-nil slices
+	if installedComponents == nil {
+		installedComponents = make([]*InstalledComponent, 0)
+	}
+
+	return &InstallationSession{
+		id:                  id,
+		configuration:       configuration,
+		status:              status,
+		snapshot:            snapshot,
+		installedComponents: installedComponents,
+		startedAt:           startedAt,
+		completedAt:         completedAt,
+		failureReason:       failureReason,
+	}, nil
+}
+
 // ID returns the unique identifier for this session
 func (s *InstallationSession) ID() string {
 	return s.id
