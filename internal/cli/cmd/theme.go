@@ -73,6 +73,25 @@ Examples:
 	RunE: runThemePreview,
 }
 
+// themeSetCmd applies a theme
+var themeSetCmd = &cobra.Command{
+	Use:   "set <theme-name>",
+	Short: "Apply a theme",
+	Long: `Apply a theme to your desktop environment.
+
+This will update configuration files for Hyprland, Waybar, Kitty, and other
+components to use the selected theme.
+
+Examples:
+  # Apply the latte theme
+  gohan theme set latte
+
+  # Apply the mocha theme
+  gohan theme set mocha`,
+	Args: cobra.ExactArgs(1),
+	RunE: runThemeSet,
+}
+
 var (
 	variantFilter string
 	verboseOutput bool
@@ -83,6 +102,7 @@ func init() {
 	themeCmd.AddCommand(themeListCmd)
 	themeCmd.AddCommand(themeShowCmd)
 	themeCmd.AddCommand(themePreviewCmd)
+	themeCmd.AddCommand(themeSetCmd)
 
 	// Flags for list command
 	themeListCmd.Flags().StringVar(&variantFilter, "variant", "", "Filter by variant (dark or light)")
@@ -211,6 +231,42 @@ func runThemePreview(cmd *cobra.Command, args []string) error {
 
 	// Display preview
 	fmt.Println(preview.PreviewText)
+
+	return nil
+}
+
+func runThemeSet(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
+	themeName := args[0]
+
+	// Initialize theme registry
+	registry := theme.NewThemeRegistry()
+	if err := theme.InitializeStandardThemes(registry); err != nil {
+		return fmt.Errorf("failed to initialize themes: %w", err)
+	}
+
+	// Create use case (no applier for now - just sets active)
+	applyUseCase := themeApp.NewApplyThemeUseCase(registry, nil)
+
+	// Execute
+	result, err := applyUseCase.Execute(ctx, themeName)
+	if err != nil {
+		return fmt.Errorf("failed to apply theme: %w", err)
+	}
+
+	// Display result
+	if result.Success {
+		fmt.Printf("\n✓ %s\n\n", result.Message)
+
+		// Show what would be affected
+		fmt.Println("Theme has been set. In a future version, this will:")
+		fmt.Println("  - Update Hyprland configuration")
+		fmt.Println("  - Update Waybar configuration")
+		fmt.Println("  - Update Kitty terminal colors")
+		fmt.Println("  - Update Rofi/Fuzzel theme")
+		fmt.Println("  - Create a backup for rollback")
+		fmt.Println()
+	}
 
 	return nil
 }
