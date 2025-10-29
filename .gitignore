@@ -34,3 +34,7 @@ dist/
 tmp/
 temp/
 overview.md
+
+# Documentation
+site/
+.venv/

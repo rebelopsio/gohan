@@ -1,0 +1,152 @@
+site_name: Gohan
+site_description: Hyprland Environment Manager - Automated installation, beautiful theming, and seamless configuration management
+site_author: RebelOps
+site_url: https://rebelopsio.github.io/gohan
+
+repo_name: rebelopsio/gohan
+repo_url: https://github.com/rebelopsio/gohan
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    # Light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep purple
+      accent: purple
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep purple
+      accent: purple
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+  features:
+    - navigation.instant      # Instant loading
+    - navigation.tracking     # URL tracking
+    - navigation.tabs         # Top-level sections as tabs
+    - navigation.sections     # Sections in sidebar
+    - navigation.expand       # Expand sections by default
+    - navigation.top          # Back to top button
+    - search.suggest          # Search suggestions
+    - search.highlight        # Highlight search terms
+    - search.share           # Share search results
+    - content.code.copy      # Copy button for code blocks
+    - content.action.edit    # Edit button on pages
+    - content.action.view    # View source button
+
+  icon:
+    repo: fontawesome/brands/github
+    edit: material/pencil
+    view: material/eye
+
+  font:
+    text: Roboto
+    code: Roboto Mono
+
+# Extensions
+markdown_extensions:
+  # Python Markdown
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - toc:
+      permalink: true
+      toc_depth: 3
+
+  # Python Markdown Extensions
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+# Navigation structure
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: installation.md
+  - User Guide:
+      - Theme Management: theme-management.md
+      - Troubleshooting: troubleshooting.md
+  - Development:
+      - Contributing: development.md
+
+# Plugins
+plugins:
+  - search:
+      lang: en
+      separator: '[\s\-\.]+'
+  - minify:
+      minify_html: true
+
+# Extra configuration
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/rebelopsio/gohan
+      name: Gohan on GitHub
+    - icon: fontawesome/brands/docker
+      link: https://github.com/rebelopsio/gohan/pkgs/container/gohan
+      name: Gohan on Docker
+
+  analytics:
+    feedback:
+      title: Was this page helpful?
+      ratings:
+        - icon: material/emoticon-happy-outline
+          name: This page was helpful
+          data: 1
+          note: >-
+            Thanks for your feedback!
+        - icon: material/emoticon-sad-outline
+          name: This page could be improved
+          data: 0
+          note: >-
+            Thanks for your feedback! Help us improve by
+            <a href="https://github.com/rebelopsio/gohan/issues/new" target="_blank" rel="noopener">opening an issue</a>.
+
+# Copyright
+copyright: Copyright &copy; 2024 RebelOps
+
+# Exclude files from build
+exclude_docs: |
+  features/
+  architecture/
+  *.md
+  !index.md
+  !installation.md
+  !theme-management.md
+  !troubleshooting.md
+  !development.md

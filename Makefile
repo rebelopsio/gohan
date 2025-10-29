@@ -1,6 +1,7 @@
 .PHONY: build build-all build-server test test-unit test-integration test-e2e test-all test-race test-wizard clean install dev-install lint
 .PHONY: server dev-server watch docker-build docker-run ci pre-commit tools bench mod-verify install-hooks
 .PHONY: act-ci act-lint act-test act-release
+.PHONY: docs-venv docs-install docs-build docs-serve docs-deploy docs-clean
 
 # Build configuration
 BINARY_NAME=gohan
@@ -8,6 +9,12 @@ VERSION?=dev
 COMMIT?=$(shell git rev-parse --short HEAD 2>/dev/null || echo "none")
 DATE?=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS=-ldflags "-s -w -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.date=${DATE}"
+
+# Python venv configuration
+VENV_DIR=.venv
+PYTHON=$(VENV_DIR)/bin/python3
+PIP=$(VENV_DIR)/bin/pip
+MKDOCS=$(VENV_DIR)/bin/mkdocs
 
 # Default target
 .DEFAULT_GOAL := help
@@ -82,6 +89,7 @@ clean:
 	@echo "Cleaning..."
 	@rm -rf bin/
 	@rm -f coverage.out coverage.html
+	@rm -rf site/
 
 # Run linter (requires golangci-lint)
 lint:
@@ -178,6 +186,48 @@ act-release:
 	@echo "Note: This requires a version tag. Use: git tag v0.1.0-test"
 	@act release -e .github/workflows/release-event.json --artifact-server-path /tmp/artifacts
 
+# ============================================================================
+# Documentation targets
+# ============================================================================
+
+# Create Python virtual environment
+docs-venv:
+	@echo "Creating Python virtual environment..."
+	@python3 -m venv $(VENV_DIR)
+	@echo "Virtual environment created at $(VENV_DIR)"
+
+# Install documentation dependencies
+docs-install: docs-venv
+	@echo "Installing documentation dependencies..."
+	@$(PIP) install --upgrade pip
+	@$(PIP) install mkdocs-material mkdocs-minify-plugin
+	@echo "Documentation dependencies installed!"
+
+# Build documentation with strict mode
+docs-build: docs-install
+	@echo "Building documentation..."
+	@$(MKDOCS) build --strict
+	@echo "Documentation built successfully in site/"
+
+# Serve documentation locally
+docs-serve: docs-install
+	@echo "Starting documentation server..."
+	@echo "Open http://127.0.0.1:8000 in your browser"
+	@$(MKDOCS) serve
+
+# Deploy documentation to GitHub Pages
+docs-deploy: docs-install
+	@echo "Deploying documentation to GitHub Pages..."
+	@$(MKDOCS) gh-deploy --force
+	@echo "Documentation deployed!"
+
+# Clean documentation build artifacts
+docs-clean:
+	@echo "Cleaning documentation artifacts..."
+	@rm -rf site/
+	@rm -rf $(VENV_DIR)
+	@echo "Documentation artifacts cleaned!"
+
 # Display help
 help:
 	@echo "Gohan - Makefile commands:"
@@ -226,6 +276,14 @@ help:
 	@echo "  make act-lint        Run lint job locally"
 	@echo "  make act-test        Run test jobs locally"
 	@echo "  make act-release     Test release workflow locally"
+	@echo ""
+	@echo "Documentation:"
+	@echo "  make docs-venv       Create Python virtual environment"
+	@echo "  make docs-install    Install MkDocs and dependencies in venv"
+	@echo "  make docs-build      Build documentation (strict mode)"
+	@echo "  make docs-serve      Serve documentation locally at http://127.0.0.1:8000"
+	@echo "  make docs-deploy     Deploy documentation to GitHub Pages"
+	@echo "  make docs-clean      Clean documentation artifacts and venv"
 	@echo ""
 	@echo "Cleanup:"
 	@echo "  make clean           Clean build artifacts"
