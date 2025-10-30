@@ -213,7 +213,7 @@ func (uc *ConfigDeployUseCase) buildConfigList(components []string) []configserv
 		switch component {
 		case "hyprland":
 			configs = append(configs, configservice.ConfigurationFile{
-				SourceTemplate: "templates/hyprland/hyprland.conf",
+				SourceTemplate: "templates/hyprland/hyprland.conf.tmpl",
 				TargetPath:     filepath.Join(configDir, "hypr/hyprland.conf"),
 				Permissions:    0644,
 				BackupBefore:   true,
@@ -226,21 +226,21 @@ func (uc *ConfigDeployUseCase) buildConfigList(components []string) []configserv
 				BackupBefore:   true,
 			})
 			configs = append(configs, configservice.ConfigurationFile{
-				SourceTemplate: "templates/waybar/style.css",
+				SourceTemplate: "templates/waybar/style.css.tmpl",
 				TargetPath:     filepath.Join(configDir, "waybar/style.css"),
 				Permissions:    0644,
 				BackupBefore:   true,
 			})
 		case "kitty":
 			configs = append(configs, configservice.ConfigurationFile{
-				SourceTemplate: "templates/kitty/kitty.conf",
+				SourceTemplate: "templates/kitty/kitty.conf.tmpl",
 				TargetPath:     filepath.Join(configDir, "kitty/kitty.conf"),
 				Permissions:    0644,
 				BackupBefore:   true,
 			})
 		case "fuzzel":
 			configs = append(configs, configservice.ConfigurationFile{
-				SourceTemplate: "templates/fuzzel/fuzzel.ini",
+				SourceTemplate: "templates/fuzzel/fuzzel.ini.tmpl",
 				TargetPath:     filepath.Join(configDir, "fuzzel/fuzzel.ini"),
 				Permissions:    0644,
 				BackupBefore:   true,
@@ -252,13 +252,42 @@ func (uc *ConfigDeployUseCase) buildConfigList(components []string) []configserv
 }
 
 func (uc *ConfigDeployUseCase) prepareTemplateVars(customVars map[string]string) templates.TemplateVars {
+	// Default theme: Catppuccin Mocha colors (without # prefix)
 	vars := templates.TemplateVars{
-		"username":  os.Getenv("USER"),
-		"home_dir":  uc.homeDir,
+		// User variables
+		"username":   os.Getenv("USER"),
+		"home":       uc.homeDir,
+		"home_dir":   uc.homeDir,
 		"config_dir": filepath.Join(uc.homeDir, ".config"),
+
+		// Theme metadata
+		"theme_name":         "mocha",
+		"theme_display_name": "Catppuccin Mocha",
+		"theme_variant":      "dark",
+
+		// Catppuccin Mocha colors (hex without #)
+		"theme_base":      "1e1e2e",
+		"theme_surface":   "313244",
+		"theme_overlay":   "45475a",
+		"theme_text":      "cdd6f4",
+		"theme_subtext":   "bac2de",
+		"theme_rosewater": "f5e0dc",
+		"theme_flamingo":  "f2cdcd",
+		"theme_pink":      "f5c2e7",
+		"theme_mauve":     "cba6f7",
+		"theme_red":       "f38ba8",
+		"theme_maroon":    "eba0ac",
+		"theme_peach":     "fab387",
+		"theme_yellow":    "f9e2af",
+		"theme_green":     "a6e3a1",
+		"theme_teal":      "94e2d5",
+		"theme_sky":       "89dceb",
+		"theme_sapphire":  "74c7ec",
+		"theme_blue":      "89b4fa",
+		"theme_lavender":  "b4befe",
 	}
 
-	// Merge custom variables
+	// Merge custom variables (can override defaults including theme)
 	for k, v := range customVars {
 		vars[k] = v
 	}
