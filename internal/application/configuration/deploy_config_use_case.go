@@ -148,6 +148,18 @@ func (uc *ConfigDeployUseCase) ExecuteWithProgress(
 		DryRun:        req.DryRun,
 	}
 
+	// Dry run - just show what would be deployed
+	if req.DryRun {
+		for _, config := range configs {
+			response.DeployedFiles = append(response.DeployedFiles, DeployedFileInfo{
+				Component:  extractComponent(config.TargetPath),
+				TargetPath: config.TargetPath,
+				Status:     "dry-run",
+			})
+		}
+		return response, nil
+	}
+
 	// Deploy with progress
 	progressChan := make(chan configservice.DeploymentProgress)
 	done := make(chan error)
