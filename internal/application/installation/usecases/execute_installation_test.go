@@ -205,6 +205,7 @@ func TestExecuteInstallationUseCase_Execute(t *testing.T) {
 			mockPkgManager,
 			nil, // historyRecorder not needed for this test
 			mockPreflight,
+		nil, // configDeployer not needed for this test
 		)
 		ctx := context.Background()
 
@@ -286,6 +287,7 @@ func TestExecuteInstallationUseCase_Execute(t *testing.T) {
 			mockPkgManager,
 			nil, // historyRecorder not needed for this test
 			mockPreflight,
+		nil, // configDeployer not needed for this test
 		)
 		ctx := context.Background()
 
@@ -315,6 +317,7 @@ func TestExecuteInstallationUseCase_Execute(t *testing.T) {
 			mockPkgManager,
 			nil, // historyRecorder not needed for this test
 			mockPreflight,
+		nil, // configDeployer not needed for this test
 		)
 		ctx := context.Background()
 
@@ -380,6 +383,7 @@ func TestExecuteInstallationUseCase_Execute(t *testing.T) {
 			mockPkgManager,
 			nil, // historyRecorder not needed for this test
 			mockPreflight,
+		nil, // configDeployer not needed for this test
 		)
 		ctx := context.Background()
 
@@ -442,6 +446,7 @@ func TestExecuteInstallationUseCase_Execute(t *testing.T) {
 			mockPkgManager,
 			nil, // historyRecorder not needed for this test
 			mockPreflight,
+		nil, // configDeployer not needed for this test
 		)
 		ctx := context.Background()
 

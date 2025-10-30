@@ -14,14 +14,8 @@ type TemplateEngine struct {
 }
 
 // TemplateVars contains variables for template substitution
-type TemplateVars struct {
-	Username   string // Current user's username
-	Home       string // User's home directory
-	ConfigDir  string // User's config directory (~/.config)
-	Hostname   string // System hostname
-	Display    string // Primary display name (e.g., eDP-1)
-	Resolution string // Primary display resolution (e.g., 1920x1080)
-}
+// Changed to map for flexibility with theme variables
+type TemplateVars map[string]string
 
 // NewTemplateEngine creates a new template engine
 func NewTemplateEngine() *TemplateEngine {
@@ -32,18 +26,9 @@ func NewTemplateEngine() *TemplateEngine {
 func (e *TemplateEngine) ProcessTemplate(content string, vars TemplateVars) (string, error) {
 	result := content
 
-	// Map of variable names to their values
-	replacements := map[string]string{
-		"{{username}}":   vars.Username,
-		"{{home}}":       vars.Home,
-		"{{config_dir}}": vars.ConfigDir,
-		"{{hostname}}":   vars.Hostname,
-		"{{display}}":    vars.Display,
-		"{{resolution}}": vars.Resolution,
-	}
-
-	// Perform replacements
-	for placeholder, value := range replacements {
+	// Perform replacements for all variables
+	for key, value := range vars {
+		placeholder := "{{" + key + "}}"
 		result = strings.ReplaceAll(result, placeholder, value)
 	}
 
@@ -80,7 +65,7 @@ func (e *TemplateEngine) ProcessFile(srcPath, dstPath string, vars TemplateVars)
 
 // CollectSystemVars collects template variables from the current system
 func CollectSystemVars() (TemplateVars, error) {
-	vars := TemplateVars{}
+	vars := make(TemplateVars)
 
 	// Get current user
 	currentUser, err := user.Current()
@@ -88,9 +73,9 @@ func CollectSystemVars() (TemplateVars, error) {
 		return vars, fmt.Errorf("failed to get current user: %w", err)
 	}
 
-	vars.Username = currentUser.Username
-	vars.Home = currentUser.HomeDir
-	vars.ConfigDir = filepath.Join(currentUser.HomeDir, ".config")
+	vars["username"] = currentUser.Username
+	vars["home"] = currentUser.HomeDir
+	vars["config_dir"] = filepath.Join(currentUser.HomeDir, ".config")
 
 	// Get hostname
 	hostname, err := os.Hostname()
@@ -98,13 +83,13 @@ func CollectSystemVars() (TemplateVars, error) {
 		// Non-fatal - just leave empty
 		hostname = ""
 	}
-	vars.Hostname = hostname
+	vars["hostname"] = hostname
 
 	// Display and Resolution are optional and would typically be detected
 	// from the running Wayland/X11 session. For now, leave empty.
 	// They can be set manually or detected by a display detection service.
-	vars.Display = detectPrimaryDisplay()
-	vars.Resolution = detectPrimaryResolution()
+	vars["display"] = detectPrimaryDisplay()
+	vars["resolution"] = detectPrimaryResolution()
 
 	return vars, nil
 }

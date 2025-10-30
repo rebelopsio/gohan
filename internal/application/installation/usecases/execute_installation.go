@@ -516,7 +516,7 @@ func (u *ExecuteInstallationUseCase) deployConfigurations(
 	}
 
 	// Get config directory for target paths
-	configDir := vars.ConfigDir
+	configDir := vars["config_dir"]
 
 	// Build list of configuration files to deploy based on installed components
 	var configFiles []configservice.ConfigurationFile

@@ -40,7 +40,7 @@ func TestConfigDeployer_DeployConfiguration(t *testing.T) {
 			BackupBefore:   false,
 		}
 
-		vars := templates.TemplateVars{Username: "testuser"}
+		vars := templates.TemplateVars{"username": "testuser"}
 		ctx := context.Background()
 
 		err = deployer.DeployConfiguration(ctx, config, vars)
@@ -122,9 +122,9 @@ config = {{config_dir}}`
 		}
 
 		vars := templates.TemplateVars{
-			Username:  "alice",
-			Home:      "/home/alice",
-			ConfigDir: "/home/alice/.config",
+			"username":   "alice",
+			"home":       "/home/alice",
+			"config_dir": "/home/alice/.config",
 		}
 		ctx := context.Background()
 

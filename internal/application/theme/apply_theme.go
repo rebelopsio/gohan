@@ -3,8 +3,10 @@ package theme
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/rebelopsio/gohan/internal/domain/theme"
+	themeInfra "github.com/rebelopsio/gohan/internal/infrastructure/theme"
 )
 
 // ThemeApplier is the interface for applying themes to the system
@@ -23,15 +25,24 @@ type ApplyThemeResult struct {
 
 // ApplyThemeUseCase applies a theme to the system
 type ApplyThemeUseCase struct {
-	registry theme.ThemeRegistry
-	applier  ThemeApplier
+	registry     theme.ThemeRegistry
+	applier      ThemeApplier
+	stateStore   themeInfra.ThemeStateStore
+	historyStore themeInfra.ThemeHistoryStore
 }
 
 // NewApplyThemeUseCase creates a new apply theme use case
-func NewApplyThemeUseCase(registry theme.ThemeRegistry, applier ThemeApplier) *ApplyThemeUseCase {
+func NewApplyThemeUseCase(
+	registry theme.ThemeRegistry,
+	applier ThemeApplier,
+	stateStore themeInfra.ThemeStateStore,
+	historyStore themeInfra.ThemeHistoryStore,
+) *ApplyThemeUseCase {
 	return &ApplyThemeUseCase{
-		registry: registry,
-		applier:  applier,
+		registry:     registry,
+		applier:      applier,
+		stateStore:   stateStore,
+		historyStore: historyStore,
 	}
 }
 
@@ -63,6 +74,29 @@ func (uc *ApplyThemeUseCase) Execute(ctx context.Context, themeName string) (*Ap
 	// Set as active
 	if err := uc.registry.SetActive(ctx, th.Name()); err != nil {
 		return nil, fmt.Errorf("failed to set active theme: %w", err)
+	}
+
+	// Save state to disk if state store is available
+	if uc.stateStore != nil {
+		state := &themeInfra.ThemeState{
+			ThemeName:   th.Name(),
+			ThemeVariant: th.Variant(),
+			SetAt:       time.Now(),
+		}
+
+		if err := uc.stateStore.Save(ctx, state); err != nil {
+			// Log error but don't fail the operation
+			// The theme is already applied and active in memory
+			fmt.Printf("Warning: failed to save theme state: %v\n", err)
+		}
+	}
+
+	// Add to history if history store is available
+	if uc.historyStore != nil {
+		if err := uc.historyStore.Add(ctx, th.Name()); err != nil {
+			// Log error but don't fail the operation
+			fmt.Printf("Warning: failed to add theme to history: %v\n", err)
+		}
 	}
 
 	return &ApplyThemeResult{

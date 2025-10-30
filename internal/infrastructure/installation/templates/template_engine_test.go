@@ -33,7 +33,7 @@ func TestTemplateEngine_ProcessTemplate(t *testing.T) {
 			name:    "single variable substitution",
 			content: "Hello {{username}}",
 			vars: templates.TemplateVars{
-				Username: "alice",
+				"username": "alice",
 			},
 			expected: "Hello alice",
 			wantErr:  false,
@@ -42,8 +42,8 @@ func TestTemplateEngine_ProcessTemplate(t *testing.T) {
 			name:    "multiple variable substitutions",
 			content: "User: {{username}}, Home: {{home}}",
 			vars: templates.TemplateVars{
-				Username: "alice",
-				Home:     "/home/alice",
+				"username": "alice",
+				"home":     "/home/alice",
 			},
 			expected: "User: alice, Home: /home/alice",
 			wantErr:  false,
@@ -52,12 +52,12 @@ func TestTemplateEngine_ProcessTemplate(t *testing.T) {
 			name:    "all supported variables",
 			content: "{{username}} {{home}} {{config_dir}} {{hostname}} {{display}} {{resolution}}",
 			vars: templates.TemplateVars{
-				Username:   "bob",
-				Home:       "/home/bob",
-				ConfigDir:  "/home/bob/.config",
-				Hostname:   "debian-box",
-				Display:    "eDP-1",
-				Resolution: "1920x1080",
+				"username":   "bob",
+				"home":       "/home/bob",
+				"config_dir": "/home/bob/.config",
+				"hostname":   "debian-box",
+				"display":    "eDP-1",
+				"resolution": "1920x1080",
 			},
 			expected: "bob /home/bob /home/bob/.config debian-box eDP-1 1920x1080",
 			wantErr:  false,
@@ -66,8 +66,8 @@ func TestTemplateEngine_ProcessTemplate(t *testing.T) {
 			name:    "variable in configuration file",
 			content: "exec-once = waybar\nmonitor = {{display}},{{resolution}},auto,1\n",
 			vars: templates.TemplateVars{
-				Display:    "HDMI-A-1",
-				Resolution: "2560x1440",
+				"display":    "HDMI-A-1",
+				"resolution": "2560x1440",
 			},
 			expected: "exec-once = waybar\nmonitor = HDMI-A-1,2560x1440,auto,1\n",
 			wantErr:  false,
@@ -76,7 +76,7 @@ func TestTemplateEngine_ProcessTemplate(t *testing.T) {
 			name:    "repeated variable substitution",
 			content: "{{username}} likes {{username}}",
 			vars: templates.TemplateVars{
-				Username: "alice",
+				"username": "alice",
 			},
 			expected: "alice likes alice",
 			wantErr:  false,
@@ -89,10 +89,10 @@ func TestTemplateEngine_ProcessTemplate(t *testing.T) {
 			wantErr:  false,
 		},
 		{
-			name:    "empty variable value - replaces with empty string",
+			name:    "undefined variable - left as-is for visibility",
 			content: "Hello {{username}}",
-			vars:    templates.TemplateVars{}, // Username is empty
-			expected: "Hello ",
+			vars:    templates.TemplateVars{}, // Variable not in map
+			expected: "Hello {{username}}",
 			wantErr:  false,
 		},
 	}
@@ -136,11 +136,11 @@ monitor = {{display}},{{resolution}},auto,1
 		dstPath := filepath.Join(tmpDir, "hyprland.conf")
 		engine := templates.NewTemplateEngine()
 		vars := templates.TemplateVars{
-			Username:   "testuser",
-			Home:       "/home/testuser",
-			ConfigDir:  "/home/testuser/.config",
-			Display:    "eDP-1",
-			Resolution: "1920x1080",
+			"username":   "testuser",
+			"home":       "/home/testuser",
+			"config_dir": "/home/testuser/.config",
+			"display":    "eDP-1",
+			"resolution": "1920x1080",
 		}
 
 		err = engine.ProcessFile(srcPath, dstPath, vars)
@@ -166,7 +166,7 @@ monitor = eDP-1,1920x1080,auto,1
 		tmpDir := t.TempDir()
 
 		engine := templates.NewTemplateEngine()
-		vars := templates.TemplateVars{Username: "test"}
+		vars := templates.TemplateVars{"username": "test"}
 
 		srcPath := filepath.Join(tmpDir, "nonexistent.tmpl")
 		dstPath := filepath.Join(tmpDir, "output.conf")
@@ -187,7 +187,7 @@ monitor = eDP-1,1920x1080,auto,1
 		dstPath := filepath.Join(tmpDir, "nested", "deep", "output.conf")
 
 		engine := templates.NewTemplateEngine()
-		vars := templates.TemplateVars{Username: "alice"}
+		vars := templates.TemplateVars{"username": "alice"}
 
 		err = engine.ProcessFile(srcPath, dstPath, vars)
 		require.NoError(t, err)
@@ -204,10 +204,10 @@ func TestTemplateVars_CollectFromSystem(t *testing.T) {
 		vars, err := templates.CollectSystemVars()
 
 		require.NoError(t, err)
-		assert.NotEmpty(t, vars.Username, "Should detect current username")
-		assert.NotEmpty(t, vars.Home, "Should detect home directory")
-		assert.NotEmpty(t, vars.ConfigDir, "Should set config directory")
-		assert.NotEmpty(t, vars.Hostname, "Should detect hostname")
+		assert.NotEmpty(t, vars["username"], "Should detect current username")
+		assert.NotEmpty(t, vars["home"], "Should detect home directory")
+		assert.NotEmpty(t, vars["config_dir"], "Should set config directory")
+		assert.NotEmpty(t, vars["hostname"], "Should detect hostname")
 
 		// Display and Resolution might be empty in non-graphical environment
 		// Just verify the function doesn't error
@@ -217,8 +217,8 @@ func TestTemplateVars_CollectFromSystem(t *testing.T) {
 		vars, err := templates.CollectSystemVars()
 
 		require.NoError(t, err)
-		expected := filepath.Join(vars.Home, ".config")
-		assert.Equal(t, expected, vars.ConfigDir)
+		expected := filepath.Join(vars["home"], ".config")
+		assert.Equal(t, expected, vars["config_dir"])
 	})
 }
 
@@ -263,12 +263,12 @@ windowrulev2 = workspace 1, class:^(kitty)$
 		// Process
 		engine := templates.NewTemplateEngine()
 		vars := templates.TemplateVars{
-			Username:   "developer",
-			Home:       "/home/developer",
-			ConfigDir:  "/home/developer/.config",
-			Hostname:   "workstation",
-			Display:    "DP-1",
-			Resolution: "3840x2160",
+			"username":   "developer",
+			"home":       "/home/developer",
+			"config_dir": "/home/developer/.config",
+			"hostname":   "workstation",
+			"display":    "DP-1",
+			"resolution": "3840x2160",
 		}
 
 		dstPath := filepath.Join(tmpDir, "hyprland.conf")
@@ -308,13 +308,13 @@ func TestTemplateEngine_EdgeCases(t *testing.T) {
 		{
 			name:    "variable at start",
 			content: "{{username}} is here",
-			vars:    templates.TemplateVars{Username: "alice"},
+			vars:    templates.TemplateVars{"username": "alice"},
 			expected: "alice is here",
 		},
 		{
 			name:    "variable at end",
 			content: "Hello {{username}}",
-			vars:    templates.TemplateVars{Username: "bob"},
+			vars:    templates.TemplateVars{"username": "bob"},
 			expected: "Hello bob",
 		},
 		{

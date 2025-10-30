@@ -16,6 +16,7 @@ import (
 	"github.com/rebelopsio/gohan/internal/infrastructure/installation/repository"
 	"github.com/rebelopsio/gohan/internal/infrastructure/installation/services"
 	"github.com/rebelopsio/gohan/internal/infrastructure/installation/templates"
+	themeInfra "github.com/rebelopsio/gohan/internal/infrastructure/theme"
 	preflightTUI "github.com/rebelopsio/gohan/internal/tui/preflight"
 )
 
@@ -34,6 +35,9 @@ type Container struct {
 	ConfigMerger            *services.ConfigurationMerger
 	PackageManager          *packagemanager.APTManager
 	ConfigDeployer          *configservice.ConfigDeployer
+	ThemeApplier            *themeInfra.ThemeApplierImpl
+	ThemeStateStore         themeInfra.ThemeStateStore
+	ThemeHistoryStore       themeInfra.ThemeHistoryStore
 
 	// Use Cases
 	StartInstallationUseCase   *usecases.StartInstallationUseCase
@@ -115,6 +119,17 @@ func (c *Container) initServices() {
 	templateEngine := templates.NewTemplateEngine()
 	backupService := backup.NewBackupService(backupDir)
 	c.ConfigDeployer = configservice.NewConfigDeployer(templateEngine, backupService)
+
+	// Theme services
+	c.ThemeApplier = themeInfra.NewThemeApplier(c.ConfigDeployer)
+
+	// Theme state store
+	stateFilePath, _ := themeInfra.GetDefaultStateFilePath()
+	c.ThemeStateStore = themeInfra.NewFileThemeStateStore(stateFilePath)
+
+	// Theme history store
+	historyFilePath, _ := themeInfra.GetDefaultHistoryFilePath()
+	c.ThemeHistoryStore = themeInfra.NewFileThemeHistoryStore(historyFilePath)
 }
 
 // initUseCases initializes all use cases

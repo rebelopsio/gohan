@@ -66,7 +66,7 @@ func TestApplyThemeUseCase_Execute(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			registry := tt.setupRegistry()
-			useCase := NewApplyThemeUseCase(registry, nil) // nil applier for now
+			useCase := NewApplyThemeUseCase(registry, nil, nil, nil) // nil applier, stateStore, historyStore for now
 
 			result, err := useCase.Execute(context.Background(), tt.themeName)
 
@@ -88,7 +88,7 @@ func TestApplyThemeUseCase_SetsActiveTheme(t *testing.T) {
 	err := theme.InitializeStandardThemes(registry)
 	require.NoError(t, err)
 
-	useCase := NewApplyThemeUseCase(registry, nil)
+	useCase := NewApplyThemeUseCase(registry, nil, nil, nil)
 
 	t.Run("sets theme as active after application", func(t *testing.T) {
 		ctx := context.Background()
