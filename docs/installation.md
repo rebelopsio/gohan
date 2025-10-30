@@ -5,10 +5,15 @@ This guide will walk you through installing Gohan and setting up your Hyprland e
 ## Prerequisites
 
 !!! info "System Requirements"
-    - **OS**: Linux (Debian/Ubuntu-based distributions recommended)
+    - **OS**: Debian Sid (unstable) or Trixie (testing) **only**
     - **Architecture**: x86_64 or ARM64
     - **Go**: Version 1.21 or higher (for building from source)
     - **Git**: For cloning the repository
+
+!!! warning "Ubuntu and Debian Stable Not Supported"
+    - **Ubuntu**: Not supported. Use official Hyprland installation methods for Ubuntu.
+    - **Debian Bookworm (stable)**: Not supported. Hyprland requires newer packages only available in Sid or Trixie.
+    - **Reason**: Gohan targets cutting-edge Hyprland features that require the latest packages from Debian's rolling branches.
 
 !!! note "Optional Dependencies"
     These components are optional but enable full theme management features:
