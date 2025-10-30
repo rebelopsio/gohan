@@ -79,7 +79,8 @@ func runPreflightCheck(cmd *cobra.Command, args []string) error {
 	var err error
 
 	if showProgress {
-		fmt.Println("🔍 Running preflight checks...\n")
+		fmt.Println("🔍 Running preflight checks...")
+		fmt.Println()
 
 		resp, err = useCase.ExecuteWithProgress(
 			ctx,
