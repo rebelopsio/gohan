@@ -6,10 +6,12 @@ import (
 	"os"
 	"text/tabwriter"
 
+	tea "github.com/charmbracelet/bubbletea"
 	themeApp "github.com/rebelopsio/gohan/internal/application/theme"
 	"github.com/rebelopsio/gohan/internal/container"
 	"github.com/rebelopsio/gohan/internal/domain/theme"
 	themeInfra "github.com/rebelopsio/gohan/internal/infrastructure/theme"
+	themeTUI "github.com/rebelopsio/gohan/internal/tui/theme"
 	"github.com/spf13/cobra"
 )
 
@@ -75,6 +77,28 @@ Examples:
 	RunE: runThemePreview,
 }
 
+// themePickCmd launches interactive theme picker
+var themePickCmd = &cobra.Command{
+	Use:   "pick",
+	Short: "Interactive theme picker",
+	Long: `Launch an interactive theme picker with color previews.
+
+Navigate through available themes with arrow keys, preview colors in real-time,
+and select a theme to apply instantly.
+
+Keyboard shortcuts:
+  ↑/k        Move up
+  ↓/j        Move down
+  Enter      Select and apply theme
+  ?          Toggle help
+  q/Esc      Quit without applying
+
+Examples:
+  # Launch interactive picker
+  gohan theme pick`,
+	RunE: runThemePick,
+}
+
 // themeSetCmd applies a theme
 var themeSetCmd = &cobra.Command{
 	Use:   "set <theme-name>",
@@ -124,6 +148,7 @@ func init() {
 	themeCmd.AddCommand(themeListCmd)
 	themeCmd.AddCommand(themeShowCmd)
 	themeCmd.AddCommand(themePreviewCmd)
+	themeCmd.AddCommand(themePickCmd)
 	themeCmd.AddCommand(themeSetCmd)
 	themeCmd.AddCommand(themeRollbackCmd)
 
@@ -254,6 +279,103 @@ func runThemePreview(cmd *cobra.Command, args []string) error {
 
 	// Display preview
 	fmt.Println(preview.PreviewText)
+
+	return nil
+}
+
+func runThemePick(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
+
+	// Initialize theme registry
+	registry, err := initializeThemeRegistry(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initialize theme registry: %w", err)
+	}
+
+	// Get list of all themes using the use case
+	listUseCase := themeApp.NewListThemesUseCase(registry)
+	themeInfoList, err := listUseCase.Execute(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to list themes: %w", err)
+	}
+
+	if len(themeInfoList) == 0 {
+		return fmt.Errorf("no themes available")
+	}
+
+	// Convert ThemeInfo to Theme objects for TUI
+	// We need to get the actual Theme objects from the registry
+	var themes []theme.Theme
+	for _, info := range themeInfoList {
+		// Get the full Theme object from the registry
+		th, err := registry.FindByName(ctx, theme.ThemeName(info.Name))
+		if err != nil {
+			continue
+		}
+		themes = append(themes, *th)
+	}
+
+	// Find current active theme
+	currentTheme := ""
+	for _, info := range themeInfoList {
+		if info.IsActive {
+			currentTheme = info.Name
+			break
+		}
+	}
+
+	// Launch interactive picker
+	model := themeTUI.New(themes, currentTheme)
+	p := tea.NewProgram(model)
+
+	finalModel, err := p.Run()
+	if err != nil {
+		return fmt.Errorf("failed to run theme picker: %w", err)
+	}
+
+	// Check if a theme was selected
+	themeModel, ok := finalModel.(themeTUI.Model)
+	if !ok {
+		return fmt.Errorf("unexpected model type")
+	}
+
+	selected := themeModel.SelectedTheme()
+	if selected == nil {
+		// User quit without selecting
+		return nil
+	}
+
+	// Apply the selected theme
+	fmt.Printf("\nApplying theme: %s...\n", selected.DisplayName())
+
+	// Initialize dependency container
+	c, err := container.New()
+	if err != nil {
+		return fmt.Errorf("failed to initialize container: %w", err)
+	}
+	defer c.Close()
+
+	// Load saved theme state if exists
+	if err := loadSavedThemeState(ctx, registry, c.ThemeStateStore); err != nil {
+		fmt.Printf("Warning: failed to load saved theme state: %v\n", err)
+	}
+
+	// Create use case with real theme applier, state store, and history store
+	applyUseCase := themeApp.NewApplyThemeUseCase(registry, c.ThemeApplier, c.ThemeStateStore, c.ThemeHistoryStore)
+
+	// Execute - convert ThemeName to string
+	result, err := applyUseCase.Execute(ctx, string(selected.Name()))
+	if err != nil {
+		return fmt.Errorf("failed to apply theme: %w", err)
+	}
+
+	// Display success message
+	fmt.Printf("\n✓ Theme '%s' applied successfully!\n", result.ThemeName)
+	fmt.Println("Updated configuration files:")
+	fmt.Println("  - Hyprland configuration")
+	fmt.Println("  - Waybar configuration")
+	fmt.Println("  - Kitty terminal colors")
+	fmt.Println("  - Rofi/Fuzzel theme")
 
 	return nil
 }

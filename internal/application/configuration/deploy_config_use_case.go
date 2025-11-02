@@ -67,8 +67,16 @@ func NewConfigDeployUseCase(
 
 // Execute runs configuration deployment
 func (uc *ConfigDeployUseCase) Execute(ctx context.Context, req DeployConfigRequest) (*DeployConfigResponse, error) {
+	// Determine home directory (use custom if provided for testing)
+	homeDir := uc.homeDir
+	if customHome, ok := req.CustomVars["home"]; ok && customHome != "" {
+		homeDir = customHome
+	} else if customHome, ok := req.CustomVars["home_dir"]; ok && customHome != "" {
+		homeDir = customHome
+	}
+
 	// Build configuration file list
-	configs := uc.buildConfigList(req.Components)
+	configs := uc.buildConfigList(req.Components, homeDir)
 
 	if len(configs) == 0 {
 		return nil, fmt.Errorf("no configurations to deploy for components: %v", req.Components)
@@ -132,8 +140,16 @@ func (uc *ConfigDeployUseCase) ExecuteWithProgress(
 	req DeployConfigRequest,
 	progressFn ProgressCallback,
 ) (*DeployConfigResponse, error) {
+	// Determine home directory (use custom if provided for testing)
+	homeDir := uc.homeDir
+	if customHome, ok := req.CustomVars["home"]; ok && customHome != "" {
+		homeDir = customHome
+	} else if customHome, ok := req.CustomVars["home_dir"]; ok && customHome != "" {
+		homeDir = customHome
+	}
+
 	// Build configuration file list
-	configs := uc.buildConfigList(req.Components)
+	configs := uc.buildConfigList(req.Components, homeDir)
 
 	if len(configs) == 0 {
 		return nil, fmt.Errorf("no configurations to deploy for components: %v", req.Components)
@@ -199,10 +215,10 @@ func (uc *ConfigDeployUseCase) ExecuteWithProgress(
 	return response, err
 }
 
-func (uc *ConfigDeployUseCase) buildConfigList(components []string) []configservice.ConfigurationFile {
+func (uc *ConfigDeployUseCase) buildConfigList(components []string, homeDir string) []configservice.ConfigurationFile {
 	configs := []configservice.ConfigurationFile{}
 
-	configDir := filepath.Join(uc.homeDir, ".config")
+	configDir := filepath.Join(homeDir, ".config")
 
 	// If no components specified, deploy all
 	if len(components) == 0 {

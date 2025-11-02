@@ -98,7 +98,10 @@ nav:
   - Getting Started:
       - Installation: installation.md
   - User Guide:
+      - Configuration Management: configuration-management.md
+      - Backup & Restore: backup-restore.md
       - Theme Management: theme-management.md
+      - CLI Reference: cli-reference.md
       - Troubleshooting: troubleshooting.md
   - Development:
       - Contributing: development.md
@@ -147,6 +150,9 @@ exclude_docs: |
   *.md
   !index.md
   !installation.md
+  !configuration-management.md
+  !backup-restore.md
   !theme-management.md
+  !cli-reference.md
   !troubleshooting.md
   !development.md
